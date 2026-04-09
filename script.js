@@ -581,17 +581,63 @@ document.getElementById('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value; renderPortarias();
 });
 
-// Downloads (Mantido como estava)
+// ==========================================
+// FUNÇÕES DE EXPORTAÇÃO (CSV)
+// ==========================================
 function downloadCSV(filename, data) {
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;
-  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  document.body.appendChild(link); 
+  link.click(); 
+  document.body.removeChild(link);
 }
 
-document.getElementById('btn-export-servidores').addEventListener('click', () => { /* Mesma lógica anterior ... */ showToast('Exportado!'); });
-document.getElementById('btn-export-portarias').addEventListener('click', () => { /* Mesma lógica anterior ... */ showToast('Exportado!'); });
+document.getElementById('btn-export-servidores').addEventListener('click', () => {
+  if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
+
+  const srvHoras = {};
+  const srvPortarias = {};
+  servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
+  
+  portarias.forEach(p => {
+    if (p.status === 'revogada') return;
+    const binding = JSON.parse(p.servidores || '{}');
+    Object.keys(binding).forEach(srvId => {
+      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId];
+      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1;
+    });
+  });
+
+  const csv = [
+    '"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias"',
+    ...servidores.map(s => `"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`)
+  ];
+  
+  const date = new Date().toISOString().split('T')[0];
+  downloadCSV(`relatorio_servidores_${date}.csv`, csv);
+  showToast('Relatório de servidores exportado!');
+});
+
+document.getElementById('btn-export-portarias').addEventListener('click', () => {
+  if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
+
+  const csv = [
+    '"Número","Descrição","Data Publicação","Data Validade","Status","Total Horas Vinculadas"',
+    ...portarias.filter(p => p.status !== 'revogada').map(p => {
+      const binding = JSON.parse(p.servidores || '{}');
+      const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
+      const s = getStatus(p.data_validade);
+      const statusText = s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida';
+      return `"${p.numero}","${p.descricao}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`;
+    })
+  ];
+  
+  const date = new Date().toISOString().split('T')[0];
+  downloadCSV(`relatorio_portarias_${date}.csv`, csv);
+  showToast('Relatório de portarias exportado!');
+});
 
 // ==========================================
 // 10. INICIALIZAÇÃO FIREBASE (Tempo Real)
