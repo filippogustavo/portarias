@@ -75,27 +75,23 @@ select {
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* Botões de Aba (Tabs) */
-.tab-btn { 
-  padding: 10px 16px; 
-  border-radius: 8px; 
-  font-size: 0.875rem; 
-  font-weight: 600; 
-  cursor: pointer; 
-  transition: all 0.2s; 
-  background: transparent; 
+/* Botões do Menu Lateral (Sidebar) */
+.sidebar-btn { 
   color: #64748b; 
-  border: 1px solid transparent; 
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
-.tab-btn.active { 
+.sidebar-btn:hover:not(.active) { 
+  background: #f8fafc; 
+  color: #0f172a; 
+}
+.sidebar-btn.active { 
   background: #eff6ff; 
-  color: #1d4ed8; 
+  color: #2563eb; 
   border-color: #bfdbfe; 
+  box-shadow: 0 2px 10px rgba(37,99,235,0.1); 
 }
-.tab-btn:hover:not(.active) { background: #f1f5f9; color: #334155; }
 
+/* Botões de Aba Secundários (Relatórios) */
 .tab-rel-btn { cursor: pointer; transition: all 0.2s; }
-.tab-rel-btn.active { background: #eff6ff !important; color: #1d4ed8 !important; border-bottom: 2px solid #2563eb; }
-
-body { box-sizing: border-box; }
-.btn-disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
+.tab-rel-btn.active { background: #eff6ff !important; color: #1d4ed8 !important; }
