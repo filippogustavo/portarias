@@ -97,11 +97,11 @@ function updateAdminUI() {
 const defaultConfig = {
   page_title: 'Controle de Portarias',
   subtitle: 'Gestão e acompanhamento de validade',
-  background_color: '#0f0f1a',
-  card_color: '#1c1c30',
-  text_color: '#e0e0f0',
-  accent_color: '#f0c040',
-  muted_color: '#8888aa',
+  background_color: '#f8fafc',
+  card_color: '#ffffff',
+  text_color: '#0f172a',
+  accent_color: '#2563eb',
+  muted_color: '#64748b',
   font_family: 'DM Sans',
   font_size: 14
 };
@@ -346,18 +346,18 @@ window.openDetailPortaria = function(id) {
   const srvList = Object.keys(binding).length > 0 
     ? Object.keys(binding).map(srvId => {
         const srv = servidores.find(s => s.__backendId === srvId);
-        return `<span class="inline-block px-2 py-1 rounded-lg bg-white/5 text-xs mr-1 mb-1">${srv ? srv.nome : 'Removido'} (${binding[srvId]}h)</span>`;
+        return `<span class="inline-block px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs mr-1 mb-1 border border-slate-200">${srv ? srv.nome : 'Removido'} (${binding[srvId]}h)</span>`;
       }).join('')
-    : '<span class="text-muted text-sm">Nenhum servidor</span>';
+    : '<span class="text-slate-500 text-sm">Nenhum servidor</span>';
     
   document.getElementById('detail-body-portaria').innerHTML = `
     <div><span class="status-pill ${s.class}">${s.label}</span></div>
-    <p class="text-white font-medium">${p.descricao}</p>
-    <div class="grid grid-cols-2 gap-3 text-sm">
-      <div class="bg-white/5 rounded p-2"><p class="text-muted text-xs mb-1">Publicação</p><p class="text-white">${formatDate(p.data_publicacao)}</p></div>
-      <div class="bg-white/5 rounded p-2"><p class="text-muted text-xs mb-1">Validade</p><p class="text-white">${formatDate(p.data_validade)}</p></div>
+    <p class="text-slate-800 font-medium mt-2">${p.descricao}</p>
+    <div class="grid grid-cols-2 gap-3 text-sm mt-4">
+      <div class="bg-slate-50 border border-slate-100 rounded-lg p-3"><p class="text-slate-500 text-xs font-bold uppercase mb-1">Publicação</p><p class="text-slate-800 font-medium">${formatDate(p.data_publicacao)}</p></div>
+      <div class="bg-slate-50 border border-slate-100 rounded-lg p-3"><p class="text-slate-500 text-xs font-bold uppercase mb-1">Validade</p><p class="text-slate-800 font-medium">${formatDate(p.data_validade)}</p></div>
     </div>
-    <div><p class="text-muted text-xs mb-2 uppercase font-medium">Servidores Vinculados</p><div>${srvList}</div></div>
+    <div class="mt-4"><p class="text-slate-500 text-xs mb-2 uppercase font-bold tracking-wide">Servidores Vinculados</p><div>${srvList}</div></div>
   `;
   document.getElementById('modal-detail-portaria').classList.remove('hidden');
   document.getElementById('modal-detail-portaria').classList.add('flex');
