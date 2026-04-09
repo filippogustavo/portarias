@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Portarias</title>
+  
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#0f172a',      /* Texto principal escuro */
+            slate_bg: '#f8fafc', /* Fundo da página cinza super claro */
+            card: '#ffffff',     /* Fundo de cards branco */
+            accent: '#2563eb',   /* Azul corporativo para botões e destaques */
+            muted: '#64748b'     /* Texto secundário */
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="stylesheet" href="style.css">
+ </head>
+ 
+ <body class="h-full bg-slate_bg font-body text-ink">
+  <div id="app" class="h-full w-full overflow-auto">
+   <div id="main-app" class="h-full flex flex-col">
+    <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-sm">
+     <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+       <h1 id="el-title" class="font-display text-2xl font-bold text-accent">Controle de Portarias</h1>
+       <p id="el-subtitle" class="text-muted text-sm mt-0.5">Gestão e acompanhamento de validade</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="btn-login" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2"> 
+          <i data-lucide="log-in" style="width:16px;height:16px;"></i> Admin 
+        </button> 
+        <button id="btn-logout" class="hidden px-4 py-2 rounded-lg text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-2"> 
+          <i data-lucide="log-out" style="width:16px;height:16px;"></i> Sair 
+        </button>
+      </div>
+     </div>
+    </header>
+    
+    <div class="max-w-7xl mx-auto px-4 py-4 flex gap-2 border-b border-slate-200 bg-white">
+      <button class="tab-btn active" data-tab="portarias"><i data-lucide="file-text" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Portarias</button> 
+      <button class="tab-btn" data-tab="servidores"><i data-lucide="users" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Servidores</button> 
+      <button class="tab-btn" data-tab="relatorio"><i data-lucide="bar-chart-3" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Relatórios</button>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+     
+     <div id="tab-portarias" class="tab-content">
+      <div class="max-w-7xl mx-auto px-4 py-6">
+       <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-slate-800">Portarias</h2>
+        <div id="btn-new-portaria" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md hover:shadow-lg cursor-pointer">
+          <i data-lucide="plus" style="width:16px;height:16px;"></i>Nova Portaria
+        </div>
+       </div>
+       
+       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-muted text-xs uppercase tracking-wider font-semibold">Total</p>
+         <p id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-green-600">Vigentes</p>
+         <p id="stat-ok" class="text-2xl font-bold mt-1 text-green-600">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-amber-600">A Vencer (30d)</p>
+         <p id="stat-warn" class="text-2xl font-bold mt-1 text-amber-600">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-red-600">Vencidas</p>
+         <p id="stat-expired" class="text-2xl font-bold mt-1 text-red-600">0</p>
+        </div>
+       </div>
+       
+       <div class="flex flex-wrap gap-3 mb-6 items-center">
+        <div class="relative flex-1 min-w-[200px]">
+          <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b;"></i> 
+          <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:36px;">
+        </div>
+        <div class="flex gap-1.5">
+          <button data-filter="all" class="filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-accent text-white shadow-sm">Todas</button> 
+          <button data-filter="ok" class="filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">Vigentes</button> 
+          <button data-filter="warn" class="filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">A Vencer</button> 
+          <button data-filter="expired" class="filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">Vencidas</button>
+        </div>
+       </div>
+       
+       <div id="portaria-list" class="space-y-3"></div>
+       <div id="empty-state" class="text-center py-20 hidden">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 mb-4">
+          <i data-lucide="file-text" style="width:28px;height:28px;color:#64748b;"></i>
+        </div>
+        <p class="text-slate-800 text-lg font-medium">Nenhuma portaria cadastrada</p>
+        <p class="text-muted text-sm mt-1">Clique em "Nova Portaria" para começar</p>
+       </div>
+      </div>
+     </div>
+     
+     <div id="tab-servidores" class="tab-content hidden">
+      <div class="max-w-7xl mx-auto px-4 py-6">
+       <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-slate-800">Cadastro de Servidores</h2>
+        <div class="flex gap-3">
+         <div id="btn-import-csv" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all cursor-pointer">
+           <i data-lucide="upload" style="width:16px;height:16px;"></i>Importar CSV
+         </div>
+         <div id="btn-new-servidor" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md cursor-pointer">
+           <i data-lucide="plus" style="width:16px;height:16px;"></i>Novo Servidor
+         </div>
+        </div>
+       </div>
+       <div id="servidor-list" class="space-y-3"></div>
+       <div id="servidor-empty" class="text-center py-20">
+         <i data-lucide="users" style="width:28px;height:28px;color:#64748b;display:inline-block;margin-bottom:16px;"></i>
+        <p class="text-slate-800 text-lg font-medium">Nenhum servidor cadastrado</p>
+        <p class="text-muted text-sm mt-1">Cadastre servidores para vinculá-los às portarias</p>
+       </div>
+      </div>
+     </div>
+     
+     <div id="tab-relatorio" class="tab-content hidden">
+      <div class="max-w-7xl mx-auto px-4 py-6">
+       <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-muted text-xs uppercase tracking-wider font-semibold">Servidores</p>
+         <p id="stat-srv-total" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-muted text-xs uppercase tracking-wider font-semibold">Total de Horas</p>
+         <p id="stat-srv-horas" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-green-600">Vigentes</p>
+         <p id="stat-port-vigentes" class="text-2xl font-bold mt-1 text-green-600">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-amber-600">A Vencer</p>
+         <p id="stat-port-vencer" class="text-2xl font-bold mt-1 text-amber-600">0</p>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-slate-200 shadow-sm">
+         <p class="text-xs uppercase tracking-wider font-semibold text-red-600">Vencidas</p>
+         <p id="stat-port-vencidas" class="text-2xl font-bold mt-1 text-red-600">0</p>
+        </div>
+       </div>
+       
+       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+         <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-slate-800">Relatório de Servidores</h3>
+          <button id="btn-export-servidores" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors flex items-center gap-1"> 
+            <i data-lucide="download" style="width:14px;height:14px;"></i>Exportar 
+          </button>
+         </div>
+         <div id="relatorio-servidores" class="bg-card rounded-xl border border-slate-200 shadow-sm p-4 space-y-2"></div>
+         <div id="relatorio-servidores-empty" class="text-center py-8 text-muted text-sm">
+          Nenhum servidor cadastrado
+         </div>
+        </div>
+        
+        <div>
+         <div class="flex gap-2 mb-4 border-b border-slate-200">
+           <button class="tab-rel-btn active px-4 py-2 text-sm font-semibold rounded-t-lg bg-slate-100 text-accent" data-tab-rel="vigentes">Vigentes</button> 
+           <button class="tab-rel-btn px-4 py-2 text-sm font-semibold rounded-t-lg bg-transparent text-muted hover:text-slate-800" data-tab-rel="vencer">A Vencer</button> 
+           <button class="tab-rel-btn px-4 py-2 text-sm font-semibold rounded-t-lg bg-transparent text-muted hover:text-slate-800" data-tab-rel="vencidas">Vencidas</button> 
+           <button id="btn-export-portarias" class="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors flex items-center gap-1"> 
+             <i data-lucide="download" style="width:14px;height:14px;"></i>Exportar 
+           </button>
+         </div>
+         <div id="rel-vigentes-content">
+          <div id="relatorio-vigentes" class="bg-card rounded-xl border border-slate-200 shadow-sm p-4 space-y-2"></div>
+         </div>
+         <div id="rel-vencer-content" class="hidden">
+          <div id="relatorio-vencer" class="bg-card rounded-xl border border-slate-200 shadow-sm p-4 space-y-2"></div>
+         </div>
+         <div id="rel-vencidas-content" class="hidden">
+          <div id="relatorio-vencidas" class="bg-card rounded-xl border border-slate-200 shadow-sm p-4 space-y-2"></div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <div id="modal-login" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-sm max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 class="font-display text-lg font-bold text-slate-800">Autenticação Admin</h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalLogin()"> 
+       <i data-lucide="x" style="width:18px;height:18px;"></i> 
+     </button>
+    </div>
+    <form id="form-login" class="p-5 space-y-4">
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Usuário</label> <input type="text" id="f-login-user" placeholder="admin" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Senha</label> <input type="password" id="f-login-pass" placeholder="••••••" required></div>
+     <div class="flex gap-3 pt-2">
+       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalLogin()">Cancelar</button> 
+       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Entrar</button>
+     </div>
+    </form>
+   </div>
+  </div>
+
+  <div id="modal-portaria" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-2xl max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 id="modal-title-portaria" class="font-display text-lg font-bold text-slate-800">Nova Portaria</h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalPortaria()"> 
+       <i data-lucide="x" style="width:18px;height:18px;"></i> 
+     </button>
+    </div>
+    <form id="form-portaria" class="p-5 space-y-4">
+     <div class="grid grid-cols-2 gap-3">
+      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Número *</label> <input type="text" id="f-portaria-numero" placeholder="001/2026" required></div>
+      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Publicação *</label> <input type="date" id="f-portaria-pub" required></div>
+     </div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Descrição *</label> <input type="text" id="f-portaria-desc" placeholder="Assunto da portaria" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade *</label> <input type="date" id="f-portaria-validade" required></div>
+     
+     <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+      <h4 class="text-sm font-bold text-slate-700 mb-3">Vincular Servidores</h4>
+      <div id="servidor-binding-list" class="space-y-2 max-h-48 overflow-auto"></div>
+     </div>
+     
+     <div class="flex gap-3 pt-2">
+       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalPortaria()">Cancelar</button> 
+       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Salvar</button>
+     </div>
+    </form>
+   </div>
+  </div>
+
+  <div id="modal-servidor" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-md max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 class="font-display text-lg font-bold text-slate-800">Novo Servidor</h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalServidor()"> 
+       <i data-lucide="x" style="width:18px;height:18px;"></i> 
+     </button>
+    </div>
+    <form id="form-servidor" class="p-5 space-y-4">
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Nome *</label> <input type="text" id="f-servidor-nome" placeholder="João Silva" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Segmento *</label> <input type="text" id="f-servidor-segmento" placeholder="Administrativo" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Setor *</label> <input type="text" id="f-servidor-setor" placeholder="TI" required></div>
+     <div class="flex gap-3 pt-2">
+       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalServidor()">Cancelar</button> 
+       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Salvar</button>
+     </div>
+    </form>
+   </div>
+  </div>
+
+  <div id="modal-detail-portaria" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-lg max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 id="detail-title-portaria" class="font-display text-lg font-bold text-slate-800"></h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeDetailPortaria()"> 
+       <i data-lucide="x" style="width:18px;height:18px;"></i> 
+     </button>
+    </div>
+    <div id="detail-body-portaria" class="p-5 space-y-4"></div>
+    <div class="p-5 pt-0 flex gap-3">
+      <button id="btn-edit-portaria" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center justify-center gap-2 transition-colors"> 
+        <i data-lucide="edit" style="width:14px;height:14px;"></i>Editar 
+      </button> 
+      <button id="btn-revoke-portaria" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center gap-2 transition-colors border border-red-100"> 
+        <i data-lucide="x-circle" style="width:14px;height:14px;"></i>Revogar 
+      </button>
+    </div>
+   </div>
+  </div>
+
+  <div id="modal-import-csv" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-md max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 class="font-display text-lg font-bold text-slate-800">Importar Servidores (CSV)</h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalImportCSV()"> 
+       <i data-lucide="x" style="width:18px;height:18px;"></i> 
+     </button>
+    </div>
+    <div class="p-5 space-y-4">
+     <div>
+      <p class="text-slate-500 text-xs mb-2">Formato: <code class="text-accent bg-blue-50 px-1 py-0.5 rounded text-xs">nome,segmento,setor</code></p>
+      <textarea id="csv-input" placeholder="João Silva,Administrativo,TI&#10;Maria Santos,Operacional,RH&#10;Pedro Costa,Técnico,Manutenção" style="min-height:120px;font-family:monospace;font-size:0.75rem;"></textarea>
+     </div>
+     <div class="flex gap-3">
+       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalImportCSV()">Cancelar</button> 
+       <button type="button" id="btn-process-csv" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Importar</button>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <div id="toast" class="toast-msg hidden" style="background:#1e293b; color:#ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.1);"></div>
+  
+  <script type="module" src="script.js"></script>
+ </body>
+</html>
