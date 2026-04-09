@@ -614,4 +614,11 @@ function initData() {
   });
 }
 
+// Inicia o banco de dados
 initData();
+
+// ADICIONE ESTAS LINHAS AQUI 👇
+// Renderiza os ícones estáticos da interface (Header, Abas, Lupa) no momento que a página abre
+if (window.lucide) {
+  lucide.createIcons();
+}
