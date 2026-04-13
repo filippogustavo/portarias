@@ -333,7 +333,15 @@ window.openDetailPortaria = function(id) {
   document.getElementById('btn-revoke-portaria').style.display = (isLoggedIn && p.status !== 'revogada') ? 'flex' : 'none';
 }
 
-document.getElementById('btn-edit-portaria').addEventListener('click', () => { if (viewingPortaria) { window.closeDetailPortaria(); openModalPortaria(viewingPortaria); } });
+// Editar portaria
+document.getElementById('btn-edit-portaria').addEventListener('click', () => { 
+  if (viewingPortaria) { 
+    window.closeDetailPortaria(); 
+    window.openModalPortaria(viewingPortaria); // <--- O erro estava aqui, faltava o "window."
+  } 
+});
+
+// Revogar portaria
 document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
   if (!viewingPortaria || !isLoggedIn) return;
   try { await updateDoc(doc(db, "portarias", viewingPortaria.__backendId), { status: 'revogada' }); window.closeDetailPortaria(); showToast('Portaria revogada!'); } 
@@ -341,7 +349,7 @@ document.getElementById('btn-revoke-portaria').addEventListener('click', async (
 });
 
 // ==========================================
-// RENDERIZAÇÃO DOS RELATÓRIOS
+// RELATÓRIOS
 // ==========================================
 window.renderRelatorios = function() {
   // 1. Relatório de Servidores
@@ -484,7 +492,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; renderPortarias(); });
 
 // ==========================================
-// EXPORTAÇÃO CSV DEFINITIVA (PÚBLICA)
+// EXPORTAÇÃO CSV
 // ==========================================
 function downloadCSV(filename, data) { 
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); 
