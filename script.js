@@ -1,17 +1,16 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  doc, 
-  updateDoc, 
-  onSnapshot 
+  getFirestore, collection, addDoc, doc, updateDoc, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// IMPORTAÇÃO DA AUTENTICAÇÃO
+import { 
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE
-// Substitua estes valores pelas credenciais do seu projeto Firebase!
 // ==========================================
+// LEMBRE-SE DE COLOCAR SUAS CHAVES AQUI
 const firebaseConfig = {
   apiKey: "AIzaSyD47CBTe09nbstXgtJZn5OfZiTRlIcqjII",
   authDomain: "portarias-9be36.firebaseapp.com",
@@ -23,6 +22,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app); // INICIALIZA A AUTENTICAÇÃO
 
 // ==========================================
 // 2. ESTADO GLOBAL
@@ -35,8 +35,11 @@ let viewingPortaria = null;
 let currentFilter = 'all';
 let searchQuery = '';
 
+let unsubPortarias = null;
+let unsubServidores = null;
+
 // ==========================================
-// 3. FUNÇÕES DE INTERFACE (Tornando globais para o HTML)
+// 3. FUNÇÕES DE INTERFACE
 // ==========================================
 window.closeModalLogin = function() {
   document.getElementById('modal-login').classList.add('hidden');
@@ -81,45 +84,18 @@ function updateAdminUI() {
   if (isLoggedIn) {
     loginBtn.classList.add('hidden');
     logoutBtn.classList.remove('hidden');
-    newPortariaBtn.classList.remove('btn-disabled');
-    newServidorBtn.classList.remove('btn-disabled');
-    importCsvBtn.classList.remove('btn-disabled');
+    newPortariaBtn.classList.remove('hidden'); // Exibe os botões apenas logado
+    newServidorBtn.classList.remove('hidden');
+    importCsvBtn.classList.remove('hidden');
   } else {
     loginBtn.classList.remove('hidden');
     logoutBtn.classList.add('hidden');
-    newPortariaBtn.classList.add('btn-disabled');
-    newServidorBtn.classList.add('btn-disabled');
-    importCsvBtn.classList.add('btn-disabled');
+    newPortariaBtn.classList.add('hidden');
+    newServidorBtn.classList.add('hidden');
+    importCsvBtn.classList.add('hidden');
   }
 }
 
-// Configuração Visual do Element SDK
-const defaultConfig = {
-  page_title: 'Controle de Portarias',
-  subtitle: 'Gestão e acompanhamento de validade',
-  background_color: '#f8fafc',
-  card_color: '#ffffff',
-  text_color: '#0f172a',
-  accent_color: '#2563eb',
-  muted_color: '#64748b',
-  font_family: 'DM Sans',
-  font_size: 14
-};
-
-if (window.elementSdk) {
-  window.elementSdk.init({
-    defaultConfig,
-    onConfigChange: async (config) => {
-      const c = key => config[key] || defaultConfig[key];
-      document.getElementById('el-title').textContent = c('page_title');
-      document.getElementById('el-subtitle').textContent = c('subtitle');
-      document.body.style.fontFamily = `${c('font_family')}, DM Sans, system-ui, sans-serif`;
-      document.body.style.background = c('background_color');
-    }
-  });
-}
-
-// Utilitários
 function formatDate(d) { 
   if (!d) return '—'; 
   const [y, m, day] = d.split('-'); 
@@ -129,10 +105,11 @@ function formatDate(d) {
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.style.borderColor = type === 'success' ? '#4ade8044' : type === 'error' ? '#f8717144' : '#fbbf2444';
+  // Cor do toast baseada no sucesso ou erro
+  t.style.borderLeft = type === 'success' ? '4px solid #10b981' : type === 'warn' ? '4px solid #f59e0b' : '4px solid #ef4444';
   t.classList.remove('hidden');
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.add('hidden'), 2500);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
 function getStatus(dateStr) {
@@ -146,30 +123,75 @@ function getStatus(dateStr) {
 }
 
 // ==========================================
-// 4. EVENTOS DE LOGIN E NAVEGAÇÃO
+// 4. SISTEMA DE LOGIN REAL (FIREBASE AUTH)
 // ==========================================
-document.getElementById('btn-login').addEventListener('click', (e) => {
-  e.preventDefault(); e.stopPropagation(); openModalLogin();
-});
 
-document.getElementById('form-login').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const user = document.getElementById('f-login-user').value;
-  const pass = document.getElementById('f-login-pass').value;
-  if (user === 'admin' && pass === 'admin') {
+// Escuta em tempo real se o usuário está logado ou não
+onAuthStateChanged(auth, (user) => {
+  if (user) {
     isLoggedIn = true;
-    window.closeModalLogin();
     updateAdminUI();
-    showToast('Autenticado com sucesso!');
+    
+    // Conecta no Firestore APENAS se estiver logado
+    unsubPortarias = onSnapshot(collection(db, "portarias"), (snapshot) => {
+      portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
+      renderPortarias();
+      renderRelatorio();
+    }, (error) => console.error("Erro ao ler portarias:", error));
+
+    unsubServidores = onSnapshot(collection(db, "servidores"), (snapshot) => {
+      servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
+      renderServidores();
+      renderRelatorio();
+    }, (error) => console.error("Erro ao ler servidores:", error));
+
   } else {
-    showToast('Credenciais inválidas', 'error');
+    // Se deslogar, limpa tudo
+    isLoggedIn = false;
+    updateAdminUI();
+    
+    // Desconecta do banco de dados
+    if (unsubPortarias) unsubPortarias();
+    if (unsubServidores) unsubServidores();
+    
+    portarias = [];
+    servidores = [];
+    renderPortarias();
+    renderServidores();
+    renderRelatorio();
   }
 });
 
-document.getElementById('btn-logout').addEventListener('click', () => {
-  isLoggedIn = false; updateAdminUI(); showToast('Desconectado!');
+document.getElementById('btn-login').addEventListener('click', (e) => {
+  e.preventDefault(); openModalLogin();
 });
 
+// AQUI ESTÁ A MÁGICA DO LOGIN SEGURO
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('f-login-user').value;
+  const pass = document.getElementById('f-login-pass').value;
+  
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    window.closeModalLogin();
+    showToast('Autenticado com sucesso!');
+  } catch (error) {
+    showToast('E-mail ou senha incorretos!', 'error');
+    console.error(error);
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  try {
+    await signOut(auth);
+    showToast('Desconectado com sucesso!');
+  } catch (error) {
+    showToast('Erro ao sair', 'error');
+  }
+});
+
+// Navegação do Menu
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
@@ -193,7 +215,7 @@ document.querySelectorAll('.tab-rel-btn').forEach(btn => {
 });
 
 // ==========================================
-// 5. GESTÃO DE PORTARIAS (Integração Firebase)
+// 5. GESTÃO DE PORTARIAS
 // ==========================================
 function openModalPortaria(portaria = null) {
   editingPortaria = portaria;
@@ -214,21 +236,23 @@ function openModalPortaria(portaria = null) {
 function renderServidorBindingList(portaria) {
   const list = document.getElementById('servidor-binding-list');
   if (servidores.length === 0) {
-    list.innerHTML = '<p class="text-muted text-xs">Nenhum servidor cadastrado</p>';
+    list.innerHTML = '<p class="text-slate-500 text-xs">Nenhum servidor cadastrado</p>';
     return;
   }
   const bindingMap = portaria ? JSON.parse(portaria.servidores || '{}') : {};
   list.innerHTML = servidores.map(srv => `
-    <div class="flex items-center gap-3 bg-white/5 p-2 rounded">
-      <input type="checkbox" data-srv-id="${srv.__backendId}" ${bindingMap[srv.__backendId] ? 'checked' : ''} style="cursor:pointer;">
-      <span class="flex-1 text-sm">${srv.nome}</span>
-      <input type="number" data-srv-hours="${srv.__backendId}" value="${bindingMap[srv.__backendId] || 0}" placeholder="horas" min="0" style="width:60px;padding:4px 8px;font-size:0.75rem;">
+    <div class="flex items-center gap-3 bg-white p-2 rounded border border-slate-100">
+      <input type="checkbox" data-srv-id="${srv.__backendId}" ${bindingMap[srv.__backendId] ? 'checked' : ''} style="cursor:pointer; accent-color: #2563eb;">
+      <span class="flex-1 text-sm font-medium text-slate-700">${srv.nome}</span>
+      <input type="number" data-srv-hours="${srv.__backendId}" value="${bindingMap[srv.__backendId] || 0}" placeholder="horas" min="0" style="width:70px;padding:4px 8px;font-size:0.75rem;">
     </div>
   `).join('');
 }
 
 document.getElementById('form-portaria').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!isLoggedIn) return showToast('Sem permissão!', 'error');
+
   const numero = document.getElementById('f-portaria-numero').value.trim();
   const pub = document.getElementById('f-portaria-pub').value;
   const desc = document.getElementById('f-portaria-desc').value.trim();
@@ -251,24 +275,22 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
 
   try {
     if (editingPortaria) {
-      // Atualizar Portaria no Firebase
       const portariaRef = doc(db, "portarias", editingPortaria.__backendId);
       await updateDoc(portariaRef, data);
       showToast('Portaria atualizada!');
     } else {
-      // Criar Nova Portaria no Firebase
       await addDoc(collection(db, "portarias"), data);
       showToast('Portaria cadastrada!');
     }
     window.closeModalPortaria(); 
   } catch (error) {
     console.error("Erro ao salvar:", error);
-    showToast('Erro ao salvar no banco', 'error');
+    showToast('Erro ao salvar no banco (Verifique as regras!)', 'error');
   }
 });
 
 // ==========================================
-// 6. GESTÃO DE SERVIDORES (Integração Firebase)
+// 6. GESTÃO DE SERVIDORES
 // ==========================================
 function openModalServidor() {
   document.getElementById('form-servidor').reset();
@@ -284,7 +306,7 @@ function openModalImportCSV() {
 
 async function processCSVImport() {
   const text = document.getElementById('csv-input').value.trim();
-  if (!text) return showToast('Digite os dados no formato correto', 'error');
+  if (!text) return showToast('Digite os dados no formato correto', 'warn');
 
   const lines = text.split('\n').filter(l => l.trim());
   let imported = 0;
@@ -333,7 +355,7 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// 7. DETALHES E REVOGAÇÃO (Integração Firebase)
+// 7. DETALHES E REVOGAÇÃO
 // ==========================================
 window.openDetailPortaria = function(id) {
   const p = portarias.find(r => r.__backendId === id);
@@ -361,6 +383,10 @@ window.openDetailPortaria = function(id) {
   `;
   document.getElementById('modal-detail-portaria').classList.remove('hidden');
   document.getElementById('modal-detail-portaria').classList.add('flex');
+  
+  // Só exibe botões de edição se for admin logado
+  document.getElementById('btn-edit-portaria').style.display = isLoggedIn ? 'flex' : 'none';
+  document.getElementById('btn-revoke-portaria').style.display = isLoggedIn ? 'flex' : 'none';
 }
 
 document.getElementById('btn-edit-portaria').addEventListener('click', () => {
@@ -368,7 +394,7 @@ document.getElementById('btn-edit-portaria').addEventListener('click', () => {
 });
 
 document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
-  if (!viewingPortaria) return;
+  if (!viewingPortaria || !isLoggedIn) return;
   
   try {
     const portariaRef = doc(db, "portarias", viewingPortaria.__backendId);
@@ -421,20 +447,20 @@ function renderPortarias() {
   list.innerHTML = filtered.map(p => {
     const s = getStatus(p.data_validade);
     return `
-      <div class="bg-card border border-white/5 rounded-xl p-4 card-hover cursor-pointer" onclick="openDetailPortaria('${p.__backendId}')">
+      <div class="bg-card border border-slate-200 rounded-2xl p-5 card-hover cursor-pointer" onclick="openDetailPortaria('${p.__backendId}')">
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1">
-            <div class="flex gap-2 items-center flex-wrap">
-              <span class="font-bold text-white text-sm">Portaria nº ${p.numero}</span>
+            <div class="flex gap-3 items-center flex-wrap">
+              <span class="font-bold text-slate-800 text-lg">Portaria nº ${p.numero}</span>
               <span class="status-pill ${s.class}">${s.label}</span>
             </div>
-            <p class="text-muted text-sm mt-1">${p.descricao}</p>
-            <div class="flex gap-4 mt-2 text-xs text-muted/70">
-              <span>Publicação: ${formatDate(p.data_publicacao)}</span>
-              <span>Validade: ${formatDate(p.data_validade)}</span>
+            <p class="text-slate-600 text-sm mt-2">${p.descricao}</p>
+            <div class="flex gap-4 mt-3 text-xs text-slate-500 font-medium">
+              <span class="flex items-center gap-1"><i data-lucide="calendar" style="width:12px;height:12px;"></i> Pub: ${formatDate(p.data_publicacao)}</span>
+              <span class="flex items-center gap-1"><i data-lucide="clock" style="width:12px;height:12px;"></i> Val: ${formatDate(p.data_validade)}</span>
             </div>
           </div>
-          <i data-lucide="chevron-right" style="width:18px;height:18px;color:#555570;"></i>
+          <i data-lucide="chevron-right" style="width:20px;height:20px;color:#cbd5e1;"></i>
         </div>
       </div>
     `;
@@ -446,20 +472,16 @@ function renderServidores() {
   const list = document.getElementById('servidor-list');
   const empty = document.getElementById('servidor-empty');
   if (servidores.length === 0) {
-    list.innerHTML = '';
-    empty.classList.remove('hidden');
-    return;
+    list.innerHTML = ''; empty.classList.remove('hidden'); return;
   }
   empty.classList.add('hidden');
   list.innerHTML = servidores.map(s => `
-    <div class="bg-card border border-white/5 rounded-xl p-4">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1">
-          <p class="font-bold text-white">${s.nome}</p>
-          <div class="flex gap-4 mt-1 text-xs text-muted">
-            <span>Segmento: ${s.segmento}</span>
-            <span>Setor: ${s.setor}</span>
-          </div>
+    <div class="bg-card border border-slate-200 rounded-2xl p-5 shadow-sm">
+      <div class="flex flex-col gap-1">
+        <p class="font-bold text-slate-800 text-lg">${s.nome}</p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${s.segmento}</span>
+          <span class="bg-blue-50 text-accent px-2 py-1 rounded text-xs font-semibold">${s.setor}</span>
         </div>
       </div>
     </div>
@@ -467,10 +489,7 @@ function renderServidores() {
 }
 
 function renderRelatorio() {
-  const srvHoras = {};
-  const srvPortarias = {};
-  let totalHoras = 0;
-  
+  const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   
   portarias.forEach(p => {
@@ -494,24 +513,21 @@ function renderRelatorio() {
   } else {
     srvEmpty.classList.add('hidden');
     srvDiv.innerHTML = servidores.map(s => `
-      <div class="bg-white/5 rounded-lg p-4 text-sm border border-white/5">
-        <p class="font-semibold text-white">${s.nome}</p>
-        <p class="text-muted text-xs mt-1">${s.segmento} • ${s.setor}</p>
-        <div class="flex gap-6 mt-3 text-xs">
-          <div class="flex items-center gap-2">
-            <i data-lucide="clock" style="width:14px;height:14px;color:#fbbf24;"></i>
-            <span><strong class="text-accent">${srvHoras[s.__backendId] || 0}h</strong> horas</span>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
+        <p class="font-bold text-slate-800">${s.nome}</p>
+        <p class="text-slate-500 text-xs mt-1 font-medium">${s.segmento} • ${s.setor}</p>
+        <div class="flex gap-4 mt-3 text-xs font-bold">
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100">
+            <i data-lucide="clock" style="width:14px;height:14px;color:#f59e0b;"></i> ${srvHoras[s.__backendId] || 0}h
           </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="file-text" style="width:14px;height:14px;color:#4ade80;"></i>
-            <span><strong class="text-accent">${srvPortarias[s.__backendId] || 0}</strong> portarias</span>
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100">
+            <i data-lucide="file-text" style="width:14px;height:14px;color:#10b981;"></i> ${srvPortarias[s.__backendId] || 0}
           </div>
         </div>
       </div>
     `).join('');
   }
 
-  // Abas de Relatório de Portarias
   const vigentes = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const aVencer = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const vencidas = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort((a, b) => getStatus(b.data_validade).days - getStatus(a.data_validade).days);
@@ -520,33 +536,33 @@ function renderRelatorio() {
   document.getElementById('stat-port-vencer').textContent = aVencer.length;
   document.getElementById('stat-port-vencidas').textContent = vencidas.length;
 
-  const renderPortariaList = (arr, divId, emptyId) => {
+  const renderPortariaList = (arr, divId) => {
     const div = document.getElementById(divId);
-    const empty = document.getElementById(emptyId);
-    if (arr.length === 0) { div.innerHTML = ''; empty.classList.remove('hidden'); }
+    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200">Nenhuma portaria nesta categoria</p>'; }
     else {
-      empty.classList.add('hidden');
       div.innerHTML = arr.map(p => {
         const s = getStatus(p.data_validade);
         const srvCount = Object.keys(JSON.parse(p.servidores || '{}')).length;
         const msgVence = s.key === 'expired' ? `Vencida há ${Math.abs(s.days)}d` : `Vence: ${formatDate(p.data_validade)}`;
         return `
-          <div class="bg-white/5 rounded-lg p-3 text-sm border border-white/5">
-            <div class="flex items-start justify-between">
-              <div><p class="font-semibold text-white">Portaria nº ${p.numero}</p><p class="text-muted text-xs mt-1">${p.descricao}</p></div>
-              <span class="status-pill ${s.class}">${s.key === 'expired' ? msgVence : s.label}</span>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="openDetailPortaria('${p.__backendId}')">
+            <div class="flex items-start justify-between gap-2">
+              <div><p class="font-bold text-slate-800 text-sm">Nº ${p.numero}</p><p class="text-slate-500 text-xs mt-0.5 line-clamp-1">${p.descricao}</p></div>
+              <span class="status-pill ${s.class} shrink-0 scale-90 origin-top-right">${s.key === 'expired' ? msgVence : s.label}</span>
             </div>
-            <div class="flex gap-4 mt-2 text-xs text-muted"><span>${msgVence}</span><span>${srvCount} servidor(es)</span></div>
+            <div class="flex gap-3 mt-3 text-xs text-slate-500 font-semibold">
+              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${msgVence}</span>
+              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${srvCount} serv.</span>
+            </div>
           </div>
         `;
       }).join('');
     }
   };
 
-  renderPortariaList(vigentes, 'relatorio-vigentes', 'relatorio-vigentes-empty');
-  renderPortariaList(aVencer, 'relatorio-vencer', 'relatorio-vencer-empty');
-  renderPortariaList(vencidas, 'relatorio-vencidas', 'relatorio-vencidas-empty');
-
+  renderPortariaList(vigentes, 'relatorio-vigentes');
+  renderPortariaList(aVencer, 'relatorio-vencer');
+  renderPortariaList(vencidas, 'relatorio-vencidas');
   if(window.lucide) lucide.createIcons();
 }
 
@@ -554,25 +570,25 @@ function renderRelatorio() {
 // 9. EVENTOS DOS BOTÕES E FILTROS
 // ==========================================
 document.getElementById('btn-new-portaria').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para adicionar portarias', 'error');
-  e.preventDefault(); e.stopPropagation(); openModalPortaria();
+  if (!isLoggedIn) return showToast('Faça login para adicionar', 'warn');
+  e.preventDefault(); openModalPortaria();
 });
 
 document.getElementById('btn-new-servidor').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para adicionar servidores', 'error');
-  e.preventDefault(); e.stopPropagation(); openModalServidor();
+  if (!isLoggedIn) return showToast('Faça login para adicionar', 'warn');
+  e.preventDefault(); openModalServidor();
 });
 
 document.getElementById('btn-import-csv').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para importar dados', 'error');
-  e.preventDefault(); e.stopPropagation(); openModalImportCSV();
+  if (!isLoggedIn) return showToast('Faça login para importar', 'warn');
+  e.preventDefault(); openModalImportCSV();
 });
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentFilter = btn.dataset.filter;
-    document.querySelectorAll('.filter-btn').forEach(b => b.className = 'filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-white/5 text-muted hover:bg-white/10');
-    btn.className = 'filter-btn px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-accent text-ink';
+    document.querySelectorAll('.filter-btn').forEach(b => b.className = 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50');
+    btn.className = 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm';
     renderPortarias();
   });
 });
@@ -582,25 +598,20 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 });
 
 // ==========================================
-// FUNÇÕES DE EXPORTAÇÃO (CSV)
+// 10. FUNÇÕES DE EXPORTAÇÃO (CSV)
 // ==========================================
 function downloadCSV(filename, data) {
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;
-  document.body.appendChild(link); 
-  link.click(); 
-  document.body.removeChild(link);
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
 document.getElementById('btn-export-servidores').addEventListener('click', () => {
   if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
-
-  const srvHoras = {};
-  const srvPortarias = {};
+  const srvHoras = {}; const srvPortarias = {};
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
-  
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
     const binding = JSON.parse(p.servidores || '{}');
@@ -609,62 +620,21 @@ document.getElementById('btn-export-servidores').addEventListener('click', () =>
       srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1;
     });
   });
-
-  const csv = [
-    '"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias"',
-    ...servidores.map(s => `"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`)
-  ];
-  
-  const date = new Date().toISOString().split('T')[0];
-  downloadCSV(`relatorio_servidores_${date}.csv`, csv);
-  showToast('Relatório de servidores exportado!');
+  const csv = ['"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias"', ...servidores.map(s => `"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`)];
+  downloadCSV(`relatorio_servidores_${new Date().toISOString().split('T')[0]}.csv`, csv);
 });
 
 document.getElementById('btn-export-portarias').addEventListener('click', () => {
   if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
-
-  const csv = [
-    '"Número","Descrição","Data Publicação","Data Validade","Status","Total Horas Vinculadas"',
-    ...portarias.filter(p => p.status !== 'revogada').map(p => {
-      const binding = JSON.parse(p.servidores || '{}');
-      const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
-      const s = getStatus(p.data_validade);
-      const statusText = s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida';
-      return `"${p.numero}","${p.descricao}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`;
-    })
-  ];
-  
-  const date = new Date().toISOString().split('T')[0];
-  downloadCSV(`relatorio_portarias_${date}.csv`, csv);
-  showToast('Relatório de portarias exportado!');
+  const csv = ['"Número","Descrição","Data Publicação","Data Validade","Status","Total Horas Vinculadas"', ...portarias.filter(p => p.status !== 'revogada').map(p => {
+    const binding = JSON.parse(p.servidores || '{}');
+    const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
+    const s = getStatus(p.data_validade);
+    return `"${p.numero}","${p.descricao}","${p.data_publicacao}","${p.data_validade}","${s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida'}",${totalHoras}`;
+  })];
+  downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv);
 });
 
-// ==========================================
-// 10. INICIALIZAÇÃO FIREBASE (Tempo Real)
-// ==========================================
-function initData() {
-  updateAdminUI();
-
-  // Escuta as portarias do Firestore
-  onSnapshot(collection(db, "portarias"), (snapshot) => {
-    portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-    renderPortarias();
-    renderRelatorio();
-  });
-
-  // Escuta os servidores do Firestore
-  onSnapshot(collection(db, "servidores"), (snapshot) => {
-    servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-    renderServidores();
-    renderRelatorio();
-  });
-}
-
-// Inicia o banco de dados
-initData();
-
-// ADICIONE ESTAS LINHAS AQUI 👇
-// Renderiza os ícones estáticos da interface (Header, Abas, Lupa) no momento que a página abre
-if (window.lucide) {
-  lucide.createIcons();
-}
+// Renderização inicial
+updateAdminUI();
+if(window.lucide) lucide.createIcons();
