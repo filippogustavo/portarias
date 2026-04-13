@@ -104,29 +104,41 @@ document.getElementById('btn-logout').addEventListener('click', async () => { aw
 // GESTÃO DE PORTARIAS E VÍNCULOS
 // ==========================================
 window.openModalPortaria = function(portaria = null) {
-  if (!isLoggedIn) return showToast('Faça login', 'warn');
+  if (!isLoggedIn) {
+    showToast('Acesso negado. Faça login para gerenciar portarias.', 'warn');
+    return;
+  }
+  
   editingPortaria = portaria;
-  document.getElementById('modal-title-portaria').textContent = portaria ? 'Editar Portaria' : 'Nova Portaria';
+  const modalTitle = document.getElementById('modal-title-portaria');
+  const form = document.getElementById('form-portaria');
+  
+  // Muda o título do modal dependendo da ação
+  modalTitle.textContent = portaria ? 'Editar Portaria' : 'Nova Portaria';
   
   if (portaria) {
+    // CARREGAMENTO DOS DADOS NO FORMULÁRIO
     document.getElementById('f-portaria-numero').value = portaria.numero || '';
     document.getElementById('f-portaria-pub').value = portaria.data_publicacao || '';
     document.getElementById('f-portaria-desc').value = portaria.descricao || '';
     document.getElementById('f-portaria-validade').value = portaria.data_validade || '';
+    
+    // Se houver uma portaria já marcada para revogar, você pode carregar aqui se desejar
+    if (document.getElementById('f-portaria-revoga')) {
+      document.getElementById('f-portaria-revoga').value = portaria.revogaAnterior || '';
+    }
   } else {
-    document.getElementById('form-portaria').reset();
+    form.reset();
+    if (document.getElementById('f-portaria-revoga')) {
+      document.getElementById('f-portaria-revoga').value = '';
+    }
   }
 
-  // Preenche o Select de Revogar Anterior
-  const selectRevoga = document.getElementById('f-portaria-revoga');
-  selectRevoga.innerHTML = '<option value="">-- Nenhuma --</option>';
-  portarias.filter(p => p.status !== 'revogada' && (!portaria || p.__backendId !== portaria.__backendId)).forEach(p => {
-    selectRevoga.innerHTML += `<option value="${p.__backendId}">Nº ${p.numero} - ${p.descricao.substring(0,30)}...</option>`;
-  });
-
-  document.getElementById('f-search-vinculo').value = ''; // Limpa a busca do modal
+  // Carrega a lista de servidores marcando os que já pertencem a esta portaria
   renderServidorBindingList(portaria);
-  document.getElementById('modal-portaria').classList.remove('hidden'); document.getElementById('modal-portaria').classList.add('flex');
+  
+  document.getElementById('modal-portaria').classList.remove('hidden');
+  document.getElementById('modal-portaria').classList.add('flex');
 };
 
 function renderServidorBindingList(portaria) {
@@ -335,10 +347,12 @@ window.openDetailPortaria = function(id) {
 
 // Editar portaria
 document.getElementById('btn-edit-portaria').addEventListener('click', () => { 
-  if (viewingPortaria) { 
+  if (viewingPortaria) {
     window.closeDetailPortaria(); 
-    window.openModalPortaria(viewingPortaria); // <--- O erro estava aqui, faltava o "window."
-  } 
+    window.openModalPortaria(viewingPortaria); 
+  } else {
+    showToast('Erro ao carregar dados da portaria.', 'error');
+  }
 });
 
 // Revogar portaria
