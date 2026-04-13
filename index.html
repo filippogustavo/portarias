@@ -320,7 +320,15 @@
     </div>
     <form id="form-servidor" class="p-5 space-y-4">
      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Nome *</label> <input type="text" id="f-servidor-nome" placeholder="João Silva" required></div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Segmento *</label> <input type="text" id="f-servidor-segmento" placeholder="Administrativo" required></div>
+     <div>
+      <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Segmento *</label> 
+      <select id="f-servidor-segmento" required>
+       <option value="" disabled selected>Selecione...</option>
+       <option value="Técnico-Administrativo">Técnico-Administrativo</option>
+       <option value="Docente">Docente</option>
+       <option value="Discente">Discente</option>
+      </select>
+     </div>
      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Setor *</label> <input type="text" id="f-servidor-setor" placeholder="TI" required></div>
      <div class="flex gap-3 pt-2">
        <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalServidor()">Cancelar</button> 
