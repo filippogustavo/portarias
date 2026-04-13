@@ -102,14 +102,15 @@
          </div>
          <div class="flex flex-wrap gap-3 mb-6 items-center">
           <div class="relative flex-1 min-w-[250px]">
-            <i data-lucide="search" style="width:18px;height:18px;position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#64748b;"></i> 
-            <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:42px; border-radius: 12px; padding-top: 12px; padding-bottom: 12px;">
+           <i data-lucide="search" style="width:18px;height:18px;position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#64748b;"></i> 
+           <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:42px; border-radius: 12px; padding-top: 12px; padding-bottom: 12px;">
           </div>
-          <div class="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm">
-            <button data-filter="all" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm">Todas</button> 
-            <button data-filter="ok" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50">Vigentes</button> 
-            <button data-filter="warn" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50">A Vencer</button> 
-            <button data-filter="expired" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50">Vencidas</button>
+          <div class="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+           <button data-filter="all" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm whitespace-nowrap">Todas Ativas</button> 
+           <button data-filter="ok" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">Vigentes</button> 
+           <button data-filter="warn" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">A Vencer</button> 
+           <button data-filter="expired" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">Vencidas</button>
+           <div class="w-px bg-slate-200 mx-1 my-1"></div> <button data-filter="revogada" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-red-600 hover:bg-red-50 whitespace-nowrap">Revogadas</button>
           </div>
          </div>
          <div id="portaria-list" class="space-y-4"></div>
@@ -258,11 +259,25 @@
       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Publicação *</label> <input type="date" id="f-portaria-pub" required></div>
      </div>
      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Descrição *</label> <input type="text" id="f-portaria-desc" placeholder="Assunto da portaria" required></div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade *</label> <input type="date" id="f-portaria-validade" required></div>
+     
+     <div class="grid grid-cols-2 gap-3">
+       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade *</label> <input type="date" id="f-portaria-validade" required></div>
+       <div>
+         <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide text-amber-600">Revoga Portaria Anterior?</label> 
+         <select id="f-portaria-revoga" class="border-amber-200 bg-amber-50 focus:border-amber-400">
+           </select>
+       </div>
+     </div>
      
      <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
-      <h4 class="text-sm font-bold text-slate-700 mb-3">Vincular Servidores</h4>
-      <div id="servidor-binding-list" class="space-y-2 max-h-48 overflow-auto"></div>
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="text-sm font-bold text-slate-700">Vincular Servidores</h4>
+        <div class="relative w-1/2">
+          <i data-lucide="search" style="width:14px;height:14px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;"></i> 
+          <input type="text" id="f-search-vinculo" onkeyup="filterServidoresBind()" placeholder="Buscar servidor..." style="padding-left:30px; padding-top:6px; padding-bottom:6px; font-size: 0.75rem;">
+        </div>
+      </div>
+      <div id="servidor-binding-list" class="space-y-2 max-h-52 overflow-y-auto pr-2"></div>
      </div>
      
      <div class="flex gap-3 pt-2">
