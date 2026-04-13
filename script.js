@@ -340,73 +340,123 @@ document.getElementById('btn-revoke-portaria').addEventListener('click', async (
   catch (error) { showToast('Erro ao revogar', 'error'); }
 });
 
-// Relatórios
-function renderRelatorio() {
+// ==========================================
+// RENDERIZAÇÃO DOS RELATÓRIOS
+// ==========================================
+window.renderRelatorios = function() {
+  // 1. Relatório de Servidores
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
+  
   portarias.forEach(p => {
-    if (p.status === 'revogada') return;
+    if (p.status === 'revogada') return; // Horas de revogadas não contam
     const binding = JSON.parse(p.servidores || '{}');
-    Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; totalHoras += binding[srvId]; });
+    Object.keys(binding).forEach(srvId => { 
+      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; 
+      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; 
+      totalHoras += binding[srvId]; 
+    });
   });
   
-  document.getElementById('stat-srv-total').textContent = servidores.length; document.getElementById('stat-srv-horas').textContent = totalHoras;
+  document.getElementById('stat-srv-total').textContent = servidores.length; 
+  document.getElementById('stat-srv-horas').textContent = totalHoras;
 
-  const srvDiv = document.getElementById('relatorio-servidores'); const srvEmpty = document.getElementById('relatorio-servidores-empty');
+  const srvDiv = document.getElementById('relatorio-servidores'); 
+  const srvEmpty = document.getElementById('relatorio-servidores-empty');
   if (servidores.length === 0) { srvDiv.innerHTML = ''; srvEmpty.classList.remove('hidden'); } else {
     srvEmpty.classList.add('hidden');
     srvDiv.innerHTML = servidores.map(s => `
-      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
-        <p class="font-bold text-slate-800">${s.nome}</p>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+        <p class="font-bold text-slate-800 text-lg">${s.nome}</p>
         <p class="text-slate-500 text-xs mt-1 font-medium">${s.segmento} • ${s.setor}</p>
-        <div class="flex gap-4 mt-3 text-xs font-bold">
-          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100"><i data-lucide="clock" style="width:14px;height:14px;color:#f59e0b;"></i> ${srvHoras[s.__backendId] || 0}h</div>
-          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100"><i data-lucide="file-text" style="width:14px;height:14px;color:#10b981;"></i> ${srvPortarias[s.__backendId] || 0}</div>
+        <div class="flex gap-4 mt-4 text-sm font-bold">
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-200"><i data-lucide="clock" style="width:16px;height:16px;color:#f59e0b;"></i> ${srvHoras[s.__backendId] || 0}h</div>
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-200"><i data-lucide="file-text" style="width:16px;height:16px;color:#10b981;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
         </div>
       </div>
     `).join('');
   }
 
+  // 2. Relatório de Portarias (Incluindo Revogadas)
   const vigentes = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const aVencer = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const vencidas = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort((a, b) => getStatus(b.data_validade).days - getStatus(a.data_validade).days);
-  document.getElementById('stat-port-vigentes').textContent = vigentes.length; document.getElementById('stat-port-vencer').textContent = aVencer.length; document.getElementById('stat-port-vencidas').textContent = vencidas.length;
+  const revogadas = portarias.filter(p => p.status === 'revogada'); // Filtro novo!
+
+  document.getElementById('stat-port-vigentes').textContent = vigentes.length; 
+  document.getElementById('stat-port-vencer').textContent = aVencer.length; 
+  document.getElementById('stat-port-vencidas').textContent = vencidas.length;
+  document.getElementById('stat-port-revogadas').textContent = revogadas.length;
 
   const renderPortariaList = (arr, divId) => {
     const div = document.getElementById(divId);
-    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200">Nenhuma portaria nesta categoria</p>'; } else {
+    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200 col-span-full">Nenhuma portaria nesta categoria</p>'; } else {
       div.innerHTML = arr.map(p => {
-        const s = getStatus(p.data_validade); const srvCount = Object.keys(JSON.parse(p.servidores || '{}')).length;
-        const msgVence = s.key === 'expired' ? `Vencida há ${Math.abs(s.days)}d` : `Vence: ${formatDate(p.data_validade)}`;
+        const isRevogada = p.status === 'revogada';
+        const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
+        const srvCount = Object.keys(JSON.parse(p.servidores || '{}')).length;
+        const msgVence = isRevogada ? 'Desativada' : s.key === 'expired' ? `Vencida há ${Math.abs(s.days)}d` : `Vence: ${formatDate(p.data_validade)}`;
+        
         return `
-          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="openDetailPortaria('${p.__backendId}')">
-            <div class="flex items-start justify-between gap-2"><div><p class="font-bold text-slate-800 text-sm">Nº ${p.numero}</p><p class="text-slate-500 text-xs mt-0.5 line-clamp-1">${p.descricao}</p></div><span class="status-pill ${s.class} shrink-0 scale-90 origin-top-right">${s.key === 'expired' ? msgVence : s.label}</span></div>
-            <div class="flex gap-3 mt-3 text-xs text-slate-500 font-semibold"><span class="bg-white px-2 py-0.5 rounded border border-slate-100">${msgVence}</span><span class="bg-white px-2 py-0.5 rounded border border-slate-100">${srvCount} serv.</span></div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="openDetailPortaria('${p.__backendId}')">
+            <div class="flex items-start justify-between gap-2">
+              <div><p class="font-bold text-slate-800 text-sm">Nº ${p.numero}</p><p class="text-slate-500 text-xs mt-0.5 line-clamp-1">${p.descricao}</p></div>
+              <span class="status-pill ${s.class} shrink-0 scale-90 origin-top-right">${s.label}</span>
+            </div>
+            <div class="flex gap-3 mt-3 text-xs text-slate-500 font-semibold">
+              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${msgVence}</span>
+              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${srvCount} serv.</span>
+            </div>
           </div>
         `;
       }).join('');
     }
   };
-  renderPortariaList(vigentes, 'relatorio-vigentes'); renderPortariaList(aVencer, 'relatorio-vencer'); renderPortariaList(vencidas, 'relatorio-vencidas');
+
+  renderPortariaList(vigentes, 'relatorio-vigentes'); 
+  renderPortariaList(aVencer, 'relatorio-vencer'); 
+  renderPortariaList(vencidas, 'relatorio-vencidas');
+  renderPortariaList(revogadas, 'relatorio-revogadas'); // Renderiza as revogadas na nova aba!
   if(window.lucide) lucide.createIcons();
 }
 
-// Navegação (Tabs)
+// Chamar função principal ao carregar os dados
+const originalRenderPortarias = renderPortarias;
+renderPortarias = function() {
+  originalRenderPortarias();
+  renderRelatorios(); // Garante que relatórios sempre atualizam com as portarias
+}
+
+// ==========================================
+// NAVEGAÇÃO E EVENTOS
+// ==========================================
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'bg-blue-50', 'text-accent'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    btn.classList.add('active'); document.getElementById(`tab-${tab}`).classList.remove('hidden');
-    if (tab === 'relatorio') renderRelatorio(); if(window.lucide) lucide.createIcons();
+    
+    // Estilo especial do menu lateral ativo
+    btn.classList.add('active', 'bg-blue-50', 'text-accent'); 
+    document.getElementById(`tab-${tab}`).classList.remove('hidden');
+    
+    if (tab.startsWith('rel-')) renderRelatorios(); // Recarrega se for uma aba de relatório
+    if(window.lucide) lucide.createIcons();
   });
 });
+
 document.querySelectorAll('.tab-rel-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tabRel;
-    document.querySelectorAll('.tab-rel-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-rel-btn').forEach(b => {
+      b.classList.remove('active', 'bg-blue-50', 'text-accent');
+      b.classList.add('bg-transparent', 'text-slate-500');
+    });
     document.querySelectorAll('[id^="rel-"][id$="-content"]').forEach(c => c.classList.add('hidden'));
-    btn.classList.add('active'); document.getElementById(`rel-${tab}-content`).classList.remove('hidden');
+    
+    btn.classList.add('active', 'bg-blue-50', 'text-accent');
+    btn.classList.remove('bg-transparent', 'text-slate-500');
+    document.getElementById(`rel-${tab}-content`).classList.remove('hidden');
   });
 });
 
@@ -420,12 +470,10 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentFilter = btn.dataset.filter;
     document.querySelectorAll('.filter-btn').forEach(b => {
-      // Reseta estilo dos botões
       b.className = b.dataset.filter === 'revogada' 
         ? 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-red-600 hover:bg-red-50 whitespace-nowrap'
         : 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap';
     });
-    // Estilo Ativo
     btn.className = btn.dataset.filter === 'revogada'
       ? 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-red-100 text-red-700 shadow-sm whitespace-nowrap'
       : 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm whitespace-nowrap';
@@ -435,10 +483,69 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 
 document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; renderPortarias(); });
 
-// CSV Downloads
-function downloadCSV(filename, data) { const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
-document.getElementById('btn-export-servidores').addEventListener('click', () => { /* ...Código de exportação idêntico mantido... */ });
-document.getElementById('btn-export-portarias').addEventListener('click', () => { /* ...Código de exportação idêntico mantido... */ });
+// ==========================================
+// EXPORTAÇÃO CSV DEFINITIVA (PÚBLICA)
+// ==========================================
+function downloadCSV(filename, data) { 
+  const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); 
+  const link = document.createElement('a'); 
+  link.href = URL.createObjectURL(blob); 
+  link.download = filename; 
+  document.body.appendChild(link); 
+  link.click(); 
+  document.body.removeChild(link); 
+}
 
+document.getElementById('btn-export-servidores').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
+  
+  const srvHoras = {}; const srvPortarias = {};
+  servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
+  
+  portarias.forEach(p => {
+    if (p.status === 'revogada') return;
+    const binding = JSON.parse(p.servidores || '{}');
+    Object.keys(binding).forEach(srvId => { 
+      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; 
+      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; 
+    });
+  });
+  
+  const csv = ['"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias Ativas"'];
+  servidores.forEach(s => {
+    csv.push(`"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`);
+  });
+  
+  downloadCSV(`relatorio_servidores_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  showToast('Download iniciado!', 'success');
+});
+
+document.getElementById('btn-export-portarias').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
+  
+  const csv = ['"Número","Descrição","Data Publicação","Data Validade","Status","Total Horas Vinculadas"'];
+  portarias.forEach(p => {
+    const binding = JSON.parse(p.servidores || '{}');
+    const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
+    
+    let statusText = 'Revogada';
+    if (p.status !== 'revogada') {
+      const s = getStatus(p.data_validade);
+      statusText = s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida';
+    }
+    
+    // Tratamento para evitar quebras no CSV caso tenha aspas na descrição
+    const descTratada = (p.descricao || '').replace(/"/g, '""');
+    
+    csv.push(`"${p.numero}","${descTratada}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`);
+  });
+  
+  downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  showToast('Download iniciado!', 'success');
+});
+
+// Renderização inicial da interface do usuário
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
