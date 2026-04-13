@@ -347,15 +347,23 @@ window.openDetailPortaria = function(id) {
   document.getElementById('btn-revoke-portaria').style.display = (isLoggedIn && p.status !== 'revogada') ? 'flex' : 'none';
 }
 
+// Editar portaria
 document.getElementById('btn-edit-portaria').addEventListener('click', () => { 
   if (viewingPortaria) {
+    // 1. Salva os dados em uma variável temporária ANTES de fechar a tela
+    const portariaParaEditar = viewingPortaria; 
+    
+    // 2. Fecha a tela de detalhes (isso limpa o viewingPortaria original)
     window.closeDetailPortaria(); 
-    window.openModalPortaria(viewingPortaria); 
+    
+    // 3. Abre a tela de edição passando os dados que salvamos em segurança
+    window.openModalPortaria(portariaParaEditar); 
   } else {
     showToast('Erro ao carregar dados.', 'error');
   }
 });
 
+// Revogar portaria
 document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
   if (!viewingPortaria || !isLoggedIn) return;
   try { await updateDoc(doc(db, "portarias", viewingPortaria.__backendId), { status: 'revogada' }); window.closeDetailPortaria(); showToast('Portaria revogada!'); } 
