@@ -563,6 +563,57 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
   showToast('Download iniciado!', 'success');
 });
 
+// ==========================================
+// RECOLHER MENU LATERAL
+// ==========================================
+const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+const sidebar = document.getElementById('sidebar');
+
+// Verifica no navegador se o usuário já deixou o menu fechado antes
+let isSidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+function applySidebarState() {
+  if (!sidebar) return;
+  const texts = document.querySelectorAll('.sidebar-text');
+  
+  if (isSidebarCollapsed) {
+    // Menu Fechado (Fica fininho)
+    sidebar.classList.remove('w-64', 'px-4');
+    sidebar.classList.add('w-20', 'px-2'); 
+    texts.forEach(el => el.style.display = 'none');
+    
+    // Centraliza apenas os ícones
+    document.querySelectorAll('.sidebar-btn').forEach(btn => {
+      btn.classList.remove('px-4');
+      btn.classList.add('px-0', 'justify-center');
+    });
+  } else {
+    // Menu Aberto (Padrão largo)
+    sidebar.classList.remove('w-20', 'px-2');
+    sidebar.classList.add('w-64', 'px-4');
+    texts.forEach(el => el.style.display = 'block');
+    
+    // Volta o alinhamento à esquerda
+    document.querySelectorAll('.sidebar-btn').forEach(btn => {
+      btn.classList.remove('px-0', 'justify-center');
+      btn.classList.add('px-4');
+    });
+  }
+}
+
+// Aplica o estado assim que a tela carrega
+applySidebarState();
+
+// Escuta o clique no botão de Hamburger
+if (btnToggleSidebar) {
+  btnToggleSidebar.addEventListener('click', () => {
+    isSidebarCollapsed = !isSidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', isSidebarCollapsed); // Salva a escolha
+    applySidebarState();
+  });
+}
+
 // Inicialização da interface do usuário
 updateAdminUI();
-if(window.lucide) lucide.createIcons();
+if(window.lucide);
+lucide.createIcons();
