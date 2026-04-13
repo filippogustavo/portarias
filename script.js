@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { 
   getFirestore, collection, addDoc, doc, updateDoc, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-// IMPORTAÇÃO DA AUTENTICAÇÃO
 import { 
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -10,7 +9,7 @@ import {
 // ==========================================
 // 1. CONFIGURAÇÃO DO FIREBASE
 // ==========================================
-// LEMBRE-SE DE COLOCAR SUAS CHAVES AQUI
+
 const firebaseConfig = {
   apiKey: "AIzaSyD47CBTe09nbstXgtJZn5OfZiTRlIcqjII",
   authDomain: "portarias-9be36.firebaseapp.com",
@@ -22,7 +21,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // INICIALIZA A AUTENTICAÇÃO
+const auth = getAuth(app);
 
 // ==========================================
 // 2. ESTADO GLOBAL
@@ -35,38 +34,14 @@ let viewingPortaria = null;
 let currentFilter = 'all';
 let searchQuery = '';
 
-let unsubPortarias = null;
-let unsubServidores = null;
-
 // ==========================================
-// 3. FUNÇÕES DE INTERFACE
+// 3. FUNÇÕES DE INTERFACE (Tornando globais)
 // ==========================================
-window.closeModalLogin = function() {
-  document.getElementById('modal-login').classList.add('hidden');
-  document.getElementById('modal-login').classList.remove('flex');
-}
-
-window.closeModalPortaria = function() {
-  document.getElementById('modal-portaria').classList.add('hidden');
-  document.getElementById('modal-portaria').classList.remove('flex');
-  editingPortaria = null;
-}
-
-window.closeModalServidor = function() {
-  document.getElementById('modal-servidor').classList.add('hidden');
-  document.getElementById('modal-servidor').classList.remove('flex');
-}
-
-window.closeModalImportCSV = function() {
-  document.getElementById('modal-import-csv').classList.add('hidden');
-  document.getElementById('modal-import-csv').classList.remove('flex');
-}
-
-window.closeDetailPortaria = function() {
-  document.getElementById('modal-detail-portaria').classList.add('hidden');
-  document.getElementById('modal-detail-portaria').classList.remove('flex');
-  viewingPortaria = null;
-}
+window.closeModalLogin = () => { document.getElementById('modal-login').classList.add('hidden'); document.getElementById('modal-login').classList.remove('flex'); }
+window.closeModalPortaria = () => { document.getElementById('modal-portaria').classList.add('hidden'); document.getElementById('modal-portaria').classList.remove('flex'); editingPortaria = null; }
+window.closeModalServidor = () => { document.getElementById('modal-servidor').classList.add('hidden'); document.getElementById('modal-servidor').classList.remove('flex'); }
+window.closeModalImportCSV = () => { document.getElementById('modal-import-csv').classList.add('hidden'); document.getElementById('modal-import-csv').classList.remove('flex'); }
+window.closeDetailPortaria = () => { document.getElementById('modal-detail-portaria').classList.add('hidden'); document.getElementById('modal-detail-portaria').classList.remove('flex'); viewingPortaria = null; }
 
 function openModalLogin() {
   document.getElementById('form-login').reset();
@@ -84,7 +59,7 @@ function updateAdminUI() {
   if (isLoggedIn) {
     loginBtn.classList.add('hidden');
     logoutBtn.classList.remove('hidden');
-    newPortariaBtn.classList.remove('hidden'); // Exibe os botões apenas logado
+    newPortariaBtn.classList.remove('hidden');
     newServidorBtn.classList.remove('hidden');
     importCsvBtn.classList.remove('hidden');
   } else {
@@ -105,7 +80,6 @@ function formatDate(d) {
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  // Cor do toast baseada no sucesso ou erro
   t.style.borderLeft = type === 'success' ? '4px solid #10b981' : type === 'warn' ? '4px solid #f59e0b' : '4px solid #ef4444';
   t.classList.remove('hidden');
   clearTimeout(t._timer);
@@ -123,62 +97,47 @@ function getStatus(dateStr) {
 }
 
 // ==========================================
-// 4. SISTEMA DE LOGIN REAL (FIREBASE AUTH)
+// 4. AUTENTICAÇÃO E CARREGAMENTO DE DADOS (LEITURA PÚBLICA)
 // ==========================================
 
-// Escuta em tempo real se o usuário está logado ou não
+// Escuta mudanças no Auth (Apenas controla botões, não os dados)
 onAuthStateChanged(auth, (user) => {
   if (user) {
     isLoggedIn = true;
-    updateAdminUI();
-    
-    // Conecta no Firestore APENAS se estiver logado
-    unsubPortarias = onSnapshot(collection(db, "portarias"), (snapshot) => {
-      portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-      renderPortarias();
-      renderRelatorio();
-    }, (error) => console.error("Erro ao ler portarias:", error));
-
-    unsubServidores = onSnapshot(collection(db, "servidores"), (snapshot) => {
-      servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-      renderServidores();
-      renderRelatorio();
-    }, (error) => console.error("Erro ao ler servidores:", error));
-
   } else {
-    // Se deslogar, limpa tudo
     isLoggedIn = false;
-    updateAdminUI();
-    
-    // Desconecta do banco de dados
-    if (unsubPortarias) unsubPortarias();
-    if (unsubServidores) unsubServidores();
-    
-    portarias = [];
-    servidores = [];
-    renderPortarias();
-    renderServidores();
-    renderRelatorio();
   }
+  updateAdminUI();
 });
 
-document.getElementById('btn-login').addEventListener('click', (e) => {
-  e.preventDefault(); openModalLogin();
-});
+// Busca Dados das Portarias (Público)
+onSnapshot(collection(db, "portarias"), (snapshot) => {
+  portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
+  renderPortarias();
+  renderRelatorio();
+}, (error) => console.error("Erro ao ler portarias:", error));
 
-// AQUI ESTÁ A MÁGICA DO LOGIN SEGURO
+// Busca Dados dos Servidores (Público)
+onSnapshot(collection(db, "servidores"), (snapshot) => {
+  servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
+  renderServidores();
+  renderRelatorio();
+}, (error) => console.error("Erro ao ler servidores:", error));
+
+
+// Eventos de Login
+document.getElementById('btn-login').addEventListener('click', (e) => { e.preventDefault(); openModalLogin(); });
+
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('f-login-user').value;
   const pass = document.getElementById('f-login-pass').value;
-  
   try {
     await signInWithEmailAndPassword(auth, email, pass);
     window.closeModalLogin();
     showToast('Autenticado com sucesso!');
   } catch (error) {
     showToast('E-mail ou senha incorretos!', 'error');
-    console.error(error);
   }
 });
 
@@ -191,7 +150,7 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
   }
 });
 
-// Navegação do Menu
+// Navegação (Tabs)
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
@@ -215,7 +174,7 @@ document.querySelectorAll('.tab-rel-btn').forEach(btn => {
 });
 
 // ==========================================
-// 5. GESTÃO DE PORTARIAS
+// 5. GESTÃO DE PORTARIAS (GRAVAÇÃO TRANCADA)
 // ==========================================
 function openModalPortaria(portaria = null) {
   editingPortaria = portaria;
@@ -236,8 +195,7 @@ function openModalPortaria(portaria = null) {
 function renderServidorBindingList(portaria) {
   const list = document.getElementById('servidor-binding-list');
   if (servidores.length === 0) {
-    list.innerHTML = '<p class="text-slate-500 text-xs">Nenhum servidor cadastrado</p>';
-    return;
+    list.innerHTML = '<p class="text-slate-500 text-xs">Nenhum servidor cadastrado</p>'; return;
   }
   const bindingMap = portaria ? JSON.parse(portaria.servidores || '{}') : {};
   list.innerHTML = servidores.map(srv => `
@@ -251,7 +209,7 @@ function renderServidorBindingList(portaria) {
 
 document.getElementById('form-portaria').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!isLoggedIn) return showToast('Sem permissão!', 'error');
+  if (!isLoggedIn) return showToast('Sem permissão para salvar!', 'error');
 
   const numero = document.getElementById('f-portaria-numero').value.trim();
   const pub = document.getElementById('f-portaria-pub').value;
@@ -267,11 +225,7 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
     }
   });
 
-  const data = {
-    numero, descricao: desc, data_publicacao: pub, data_validade: val,
-    servidores: JSON.stringify(servidorBinding),
-    status: 'ativo'
-  };
+  const data = { numero, descricao: desc, data_publicacao: pub, data_validade: val, servidores: JSON.stringify(servidorBinding), status: 'ativo' };
 
   try {
     if (editingPortaria) {
@@ -283,75 +237,45 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
       showToast('Portaria cadastrada!');
     }
     window.closeModalPortaria(); 
-  } catch (error) {
-    console.error("Erro ao salvar:", error);
-    showToast('Erro ao salvar no banco (Verifique as regras!)', 'error');
-  }
+  } catch (error) { showToast('Erro ao salvar no banco', 'error'); }
 });
 
 // ==========================================
-// 6. GESTÃO DE SERVIDORES
+// 6. GESTÃO DE SERVIDORES (GRAVAÇÃO TRANCADA)
 // ==========================================
-function openModalServidor() {
-  document.getElementById('form-servidor').reset();
-  document.getElementById('modal-servidor').classList.remove('hidden');
-  document.getElementById('modal-servidor').classList.add('flex');
-}
-
-function openModalImportCSV() {
-  document.getElementById('csv-input').value = '';
-  document.getElementById('modal-import-csv').classList.remove('hidden');
-  document.getElementById('modal-import-csv').classList.add('flex');
-}
+function openModalServidor() { document.getElementById('form-servidor').reset(); document.getElementById('modal-servidor').classList.remove('hidden'); document.getElementById('modal-servidor').classList.add('flex'); }
+function openModalImportCSV() { document.getElementById('csv-input').value = ''; document.getElementById('modal-import-csv').classList.remove('hidden'); document.getElementById('modal-import-csv').classList.add('flex'); }
 
 async function processCSVImport() {
   const text = document.getElementById('csv-input').value.trim();
   if (!text) return showToast('Digite os dados no formato correto', 'warn');
-
   const lines = text.split('\n').filter(l => l.trim());
-  let imported = 0;
-  let errors = 0;
-  
+  let imported = 0; let errors = 0;
   for (const line of lines) {
     const parts = line.split(',').map(p => p.trim());
     if (parts.length !== 3) { errors++; continue; }
-
-    const data = { nome: parts[0], segmento: parts[1], setor: parts[2] };
-    
-    try {
-      await addDoc(collection(db, "servidores"), data);
-      imported++;
-    } catch (e) {
-      errors++;
-    }
+    try { await addDoc(collection(db, "servidores"), { nome: parts[0], segmento: parts[1], setor: parts[2] }); imported++; } catch (e) { errors++; }
   }
-
   window.closeModalImportCSV();
   showToast(`Importados ${imported} servidores${errors > 0 ? ` (${errors} erro(s))` : ''}`);
 }
 
-document.getElementById('btn-process-csv').addEventListener('click', (e) => {
-  e.preventDefault(); e.stopPropagation(); processCSVImport();
-});
+document.getElementById('btn-process-csv').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); processCSVImport(); });
 
 document.getElementById('form-servidor').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!isLoggedIn) return showToast('Faça login primeiro', 'error');
+  if (!isLoggedIn) return showToast('Sem permissão para salvar!', 'error');
   
   const data = {
     nome: document.getElementById('f-servidor-nome').value.trim(),
     segmento: document.getElementById('f-servidor-segmento').value.trim(),
     setor: document.getElementById('f-servidor-setor').value.trim()
   };
-
   try {
     await addDoc(collection(db, "servidores"), data);
     window.closeModalServidor();
     showToast('Servidor cadastrado!');
-  } catch (error) {
-    console.error("Erro ao salvar servidor:", error);
-    showToast('Erro ao salvar no banco', 'error');
-  }
+  } catch (error) { showToast('Erro ao salvar no banco', 'error'); }
 });
 
 // ==========================================
@@ -384,27 +308,20 @@ window.openDetailPortaria = function(id) {
   document.getElementById('modal-detail-portaria').classList.remove('hidden');
   document.getElementById('modal-detail-portaria').classList.add('flex');
   
-  // Só exibe botões de edição se for admin logado
   document.getElementById('btn-edit-portaria').style.display = isLoggedIn ? 'flex' : 'none';
   document.getElementById('btn-revoke-portaria').style.display = isLoggedIn ? 'flex' : 'none';
 }
 
-document.getElementById('btn-edit-portaria').addEventListener('click', () => {
-  if (viewingPortaria) { window.closeDetailPortaria(); openModalPortaria(viewingPortaria); }
-});
+document.getElementById('btn-edit-portaria').addEventListener('click', () => { if (viewingPortaria) { window.closeDetailPortaria(); openModalPortaria(viewingPortaria); } });
 
 document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
   if (!viewingPortaria || !isLoggedIn) return;
-  
   try {
     const portariaRef = doc(db, "portarias", viewingPortaria.__backendId);
     await updateDoc(portariaRef, { status: 'revogada' });
     window.closeDetailPortaria(); 
     showToast('Portaria revogada!');
-  } catch (error) {
-    console.error("Erro ao revogar:", error);
-    showToast('Erro ao revogar', 'error');
-  }
+  } catch (error) { showToast('Erro ao revogar', 'error'); }
 });
 
 // ==========================================
@@ -432,16 +349,9 @@ function renderPortarias() {
     if (s.key === 'ok') ok++; else if (s.key === 'warn') warn++; else exp++;
   });
   
-  document.getElementById('stat-total').textContent = ok + warn + exp;
-  document.getElementById('stat-ok').textContent = ok;
-  document.getElementById('stat-warn').textContent = warn;
-  document.getElementById('stat-expired').textContent = exp;
+  document.getElementById('stat-total').textContent = ok + warn + exp; document.getElementById('stat-ok').textContent = ok; document.getElementById('stat-warn').textContent = warn; document.getElementById('stat-expired').textContent = exp;
   
-  if (filtered.length === 0) {
-    list.innerHTML = '';
-    document.getElementById('empty-state').classList.remove('hidden');
-    return;
-  }
+  if (filtered.length === 0) { list.innerHTML = ''; document.getElementById('empty-state').classList.remove('hidden'); return; }
   document.getElementById('empty-state').classList.add('hidden');
 
   list.innerHTML = filtered.map(p => {
@@ -450,10 +360,7 @@ function renderPortarias() {
       <div class="bg-card border border-slate-200 rounded-2xl p-5 card-hover cursor-pointer" onclick="openDetailPortaria('${p.__backendId}')">
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1">
-            <div class="flex gap-3 items-center flex-wrap">
-              <span class="font-bold text-slate-800 text-lg">Portaria nº ${p.numero}</span>
-              <span class="status-pill ${s.class}">${s.label}</span>
-            </div>
+            <div class="flex gap-3 items-center flex-wrap"><span class="font-bold text-slate-800 text-lg">Portaria nº ${p.numero}</span><span class="status-pill ${s.class}">${s.label}</span></div>
             <p class="text-slate-600 text-sm mt-2">${p.descricao}</p>
             <div class="flex gap-4 mt-3 text-xs text-slate-500 font-medium">
               <span class="flex items-center gap-1"><i data-lucide="calendar" style="width:12px;height:12px;"></i> Pub: ${formatDate(p.data_publicacao)}</span>
@@ -471,9 +378,7 @@ function renderPortarias() {
 function renderServidores() {
   const list = document.getElementById('servidor-list');
   const empty = document.getElementById('servidor-empty');
-  if (servidores.length === 0) {
-    list.innerHTML = ''; empty.classList.remove('hidden'); return;
-  }
+  if (servidores.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
   list.innerHTML = servidores.map(s => `
     <div class="bg-card border border-slate-200 rounded-2xl p-5 shadow-sm">
@@ -491,38 +396,24 @@ function renderServidores() {
 function renderRelatorio() {
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
-  
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
     const binding = JSON.parse(p.servidores || '{}');
-    Object.keys(binding).forEach(srvId => {
-      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId];
-      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1;
-      totalHoras += binding[srvId];
-    });
+    Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; totalHoras += binding[srvId]; });
   });
   
-  document.getElementById('stat-srv-total').textContent = servidores.length;
-  document.getElementById('stat-srv-horas').textContent = totalHoras;
+  document.getElementById('stat-srv-total').textContent = servidores.length; document.getElementById('stat-srv-horas').textContent = totalHoras;
 
-  const srvDiv = document.getElementById('relatorio-servidores');
-  const srvEmpty = document.getElementById('relatorio-servidores-empty');
-  
-  if (servidores.length === 0) {
-    srvDiv.innerHTML = ''; srvEmpty.classList.remove('hidden');
-  } else {
+  const srvDiv = document.getElementById('relatorio-servidores'); const srvEmpty = document.getElementById('relatorio-servidores-empty');
+  if (servidores.length === 0) { srvDiv.innerHTML = ''; srvEmpty.classList.remove('hidden'); } else {
     srvEmpty.classList.add('hidden');
     srvDiv.innerHTML = servidores.map(s => `
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
         <p class="font-bold text-slate-800">${s.nome}</p>
         <p class="text-slate-500 text-xs mt-1 font-medium">${s.segmento} • ${s.setor}</p>
         <div class="flex gap-4 mt-3 text-xs font-bold">
-          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100">
-            <i data-lucide="clock" style="width:14px;height:14px;color:#f59e0b;"></i> ${srvHoras[s.__backendId] || 0}h
-          </div>
-          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100">
-            <i data-lucide="file-text" style="width:14px;height:14px;color:#10b981;"></i> ${srvPortarias[s.__backendId] || 0}
-          </div>
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100"><i data-lucide="clock" style="width:14px;height:14px;color:#f59e0b;"></i> ${srvHoras[s.__backendId] || 0}h</div>
+          <div class="flex items-center gap-1.5 text-slate-700 bg-white px-2 py-1 rounded border border-slate-100"><i data-lucide="file-text" style="width:14px;height:14px;color:#10b981;"></i> ${srvPortarias[s.__backendId] || 0}</div>
         </div>
       </div>
     `).join('');
@@ -531,58 +422,33 @@ function renderRelatorio() {
   const vigentes = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const aVencer = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const vencidas = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort((a, b) => getStatus(b.data_validade).days - getStatus(a.data_validade).days);
-  
-  document.getElementById('stat-port-vigentes').textContent = vigentes.length;
-  document.getElementById('stat-port-vencer').textContent = aVencer.length;
-  document.getElementById('stat-port-vencidas').textContent = vencidas.length;
+  document.getElementById('stat-port-vigentes').textContent = vigentes.length; document.getElementById('stat-port-vencer').textContent = aVencer.length; document.getElementById('stat-port-vencidas').textContent = vencidas.length;
 
   const renderPortariaList = (arr, divId) => {
     const div = document.getElementById(divId);
-    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200">Nenhuma portaria nesta categoria</p>'; }
-    else {
+    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200">Nenhuma portaria nesta categoria</p>'; } else {
       div.innerHTML = arr.map(p => {
-        const s = getStatus(p.data_validade);
-        const srvCount = Object.keys(JSON.parse(p.servidores || '{}')).length;
+        const s = getStatus(p.data_validade); const srvCount = Object.keys(JSON.parse(p.servidores || '{}')).length;
         const msgVence = s.key === 'expired' ? `Vencida há ${Math.abs(s.days)}d` : `Vence: ${formatDate(p.data_validade)}`;
         return `
           <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="openDetailPortaria('${p.__backendId}')">
-            <div class="flex items-start justify-between gap-2">
-              <div><p class="font-bold text-slate-800 text-sm">Nº ${p.numero}</p><p class="text-slate-500 text-xs mt-0.5 line-clamp-1">${p.descricao}</p></div>
-              <span class="status-pill ${s.class} shrink-0 scale-90 origin-top-right">${s.key === 'expired' ? msgVence : s.label}</span>
-            </div>
-            <div class="flex gap-3 mt-3 text-xs text-slate-500 font-semibold">
-              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${msgVence}</span>
-              <span class="bg-white px-2 py-0.5 rounded border border-slate-100">${srvCount} serv.</span>
-            </div>
+            <div class="flex items-start justify-between gap-2"><div><p class="font-bold text-slate-800 text-sm">Nº ${p.numero}</p><p class="text-slate-500 text-xs mt-0.5 line-clamp-1">${p.descricao}</p></div><span class="status-pill ${s.class} shrink-0 scale-90 origin-top-right">${s.key === 'expired' ? msgVence : s.label}</span></div>
+            <div class="flex gap-3 mt-3 text-xs text-slate-500 font-semibold"><span class="bg-white px-2 py-0.5 rounded border border-slate-100">${msgVence}</span><span class="bg-white px-2 py-0.5 rounded border border-slate-100">${srvCount} serv.</span></div>
           </div>
         `;
       }).join('');
     }
   };
-
-  renderPortariaList(vigentes, 'relatorio-vigentes');
-  renderPortariaList(aVencer, 'relatorio-vencer');
-  renderPortariaList(vencidas, 'relatorio-vencidas');
+  renderPortariaList(vigentes, 'relatorio-vigentes'); renderPortariaList(aVencer, 'relatorio-vencer'); renderPortariaList(vencidas, 'relatorio-vencidas');
   if(window.lucide) lucide.createIcons();
 }
 
 // ==========================================
-// 9. EVENTOS DOS BOTÕES E FILTROS
+// 9. EVENTOS DOS BOTÕES DE AÇÃO E EXPORTAÇÃO
 // ==========================================
-document.getElementById('btn-new-portaria').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para adicionar', 'warn');
-  e.preventDefault(); openModalPortaria();
-});
-
-document.getElementById('btn-new-servidor').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para adicionar', 'warn');
-  e.preventDefault(); openModalServidor();
-});
-
-document.getElementById('btn-import-csv').addEventListener('click', (e) => {
-  if (!isLoggedIn) return showToast('Faça login para importar', 'warn');
-  e.preventDefault(); openModalImportCSV();
-});
+document.getElementById('btn-new-portaria').addEventListener('click', (e) => { if (!isLoggedIn) return showToast('Acesso negado. Faça login.', 'warn'); e.preventDefault(); openModalPortaria(); });
+document.getElementById('btn-new-servidor').addEventListener('click', (e) => { if (!isLoggedIn) return showToast('Acesso negado. Faça login.', 'warn'); e.preventDefault(); openModalServidor(); });
+document.getElementById('btn-import-csv').addEventListener('click', (e) => { if (!isLoggedIn) return showToast('Acesso negado. Faça login.', 'warn'); e.preventDefault(); openModalImportCSV(); });
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -593,13 +459,8 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-document.getElementById('search-input').addEventListener('input', (e) => {
-  searchQuery = e.target.value; renderPortarias();
-});
+document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; renderPortarias(); });
 
-// ==========================================
-// 10. FUNÇÕES DE EXPORTAÇÃO (CSV)
-// ==========================================
 function downloadCSV(filename, data) {
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -609,23 +470,20 @@ function downloadCSV(filename, data) {
 }
 
 document.getElementById('btn-export-servidores').addEventListener('click', () => {
-  if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
+  if (servidores.length === 0) return showToast('Não há servidores', 'warn');
   const srvHoras = {}; const srvPortarias = {};
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
     const binding = JSON.parse(p.servidores || '{}');
-    Object.keys(binding).forEach(srvId => {
-      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId];
-      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1;
-    });
+    Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; });
   });
   const csv = ['"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias"', ...servidores.map(s => `"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`)];
   downloadCSV(`relatorio_servidores_${new Date().toISOString().split('T')[0]}.csv`, csv);
 });
 
 document.getElementById('btn-export-portarias').addEventListener('click', () => {
-  if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
+  if (portarias.length === 0) return showToast('Não há portarias', 'warn');
   const csv = ['"Número","Descrição","Data Publicação","Data Validade","Status","Total Horas Vinculadas"', ...portarias.filter(p => p.status !== 'revogada').map(p => {
     const binding = JSON.parse(p.servidores || '{}');
     const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
@@ -635,6 +493,6 @@ document.getElementById('btn-export-portarias').addEventListener('click', () => 
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv);
 });
 
-// Renderização inicial
+// Renderização inicial e checagem de Login UI
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
