@@ -7,7 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ==========================================
-// 1. CONFIGURAÇÃO DO FIREBASE (Mantenha as suas chaves aqui)
+// 1. CONFIGURAÇÃO DO FIREBASE
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyD47CBTe09nbstXgtJZn5OfZiTRlIcqjII",
@@ -82,14 +82,13 @@ onAuthStateChanged(auth, (user) => { isLoggedIn = !!user; updateAdminUI(); rende
 
 onSnapshot(collection(db, "portarias"), (snapshot) => {
   portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-  renderPortarias(); renderRelatorio();
+  renderPortarias(); renderRelatorios();
 }, (error) => console.error("Erro portarias:", error));
 
 onSnapshot(collection(db, "servidores"), (snapshot) => {
   servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-  // Ordena servidores por nome alfabeticamente
   servidores.sort((a,b) => a.nome.localeCompare(b.nome));
-  renderServidores(); renderRelatorio();
+  renderServidores(); renderRelatorios();
 }, (error) => console.error("Erro servidores:", error));
 
 document.getElementById('btn-login').addEventListener('click', (e) => { e.preventDefault(); openModalLogin(); });
@@ -113,28 +112,32 @@ window.openModalPortaria = function(portaria = null) {
   const modalTitle = document.getElementById('modal-title-portaria');
   const form = document.getElementById('form-portaria');
   
-  // Muda o título do modal dependendo da ação
   modalTitle.textContent = portaria ? 'Editar Portaria' : 'Nova Portaria';
   
+  // 1. CARREGA O COMBOBOX DE REVOGAR ANTERIOR
+  const selectRevoga = document.getElementById('f-portaria-revoga');
+  if (selectRevoga) {
+    selectRevoga.innerHTML = '<option value="">-- Nenhuma --</option>';
+    // Adiciona apenas as ativas e ignora a própria portaria que está sendo editada
+    portarias.filter(p => p.status !== 'revogada' && (!portaria || p.__backendId !== portaria.__backendId)).forEach(p => {
+      selectRevoga.innerHTML += `<option value="${p.__backendId}">Nº ${p.numero} - ${p.descricao.substring(0,30)}...</option>`;
+    });
+  }
+
+  // 2. PREENCHE OS DADOS (SE FOR EDIÇÃO)
   if (portaria) {
-    // CARREGAMENTO DOS DADOS NO FORMULÁRIO
     document.getElementById('f-portaria-numero').value = portaria.numero || '';
     document.getElementById('f-portaria-pub').value = portaria.data_publicacao || '';
     document.getElementById('f-portaria-desc').value = portaria.descricao || '';
     document.getElementById('f-portaria-validade').value = portaria.data_validade || '';
-    
-    // Se houver uma portaria já marcada para revogar, você pode carregar aqui se desejar
-    if (document.getElementById('f-portaria-revoga')) {
-      document.getElementById('f-portaria-revoga').value = portaria.revogaAnterior || '';
-    }
   } else {
     form.reset();
-    if (document.getElementById('f-portaria-revoga')) {
-      document.getElementById('f-portaria-revoga').value = '';
-    }
   }
 
-  // Carrega a lista de servidores marcando os que já pertencem a esta portaria
+  // 3. LIMPA A BUSCA E CARREGA SERVIDORES
+  const searchVinculo = document.getElementById('f-search-vinculo');
+  if(searchVinculo) searchVinculo.value = '';
+  
   renderServidorBindingList(portaria);
   
   document.getElementById('modal-portaria').classList.remove('hidden');
@@ -147,7 +150,6 @@ function renderServidorBindingList(portaria) {
   
   const bindingMap = portaria ? JSON.parse(portaria.servidores || '{}') : {};
   
-  // NOVO LAYOUT: Não amassa o nome. Usa grid/flex com truncate.
   list.innerHTML = servidores.map(srv => `
     <div class="bind-row flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200" data-name="${srv.nome.toLowerCase()} ${srv.segmento.toLowerCase()} ${srv.setor.toLowerCase()}">
       <div class="flex items-center gap-3 overflow-hidden">
@@ -162,7 +164,6 @@ function renderServidorBindingList(portaria) {
   `).join('');
 }
 
-// FUNÇÃO DE BUSCA DENTRO DO MODAL (Filtra a lista sem recarregar o HTML)
 window.filterServidoresBind = function() {
   const query = document.getElementById('f-search-vinculo').value.toLowerCase();
   document.querySelectorAll('.bind-row').forEach(row => {
@@ -193,7 +194,8 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
     status: 'ativo' 
   };
 
-  const idRevogar = document.getElementById('f-portaria-revoga').value;
+  const selectRevoga = document.getElementById('f-portaria-revoga');
+  const idRevogar = selectRevoga ? selectRevoga.value : null;
 
   try {
     if (editingPortaria) {
@@ -202,14 +204,19 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
     } else {
       await addDoc(collection(db, "portarias"), data);
       showToast('Portaria cadastrada!');
-      // Se selecionou uma para revogar, revoga a anterior logo em seguida
-      if (idRevogar) {
-        await updateDoc(doc(db, "portarias", idRevogar), { status: 'revogada' });
-        showToast('Portaria anterior revogada automaticamente!', 'success');
-      }
     }
+
+    // Se escolheu revogar uma anterior, executa agora
+    if (idRevogar) {
+      await updateDoc(doc(db, "portarias", idRevogar), { status: 'revogada' });
+      showToast('Portaria anterior revogada automaticamente!', 'success');
+    }
+
     window.closeModalPortaria(); 
-  } catch (error) { showToast('Erro ao salvar no banco', 'error'); }
+  } catch (error) { 
+    console.error(error);
+    showToast('Erro ao salvar no banco', 'error'); 
+  }
 });
 
 // ==========================================
@@ -218,7 +225,6 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
 window.openModalServidor = function() { if (!isLoggedIn) return showToast('Faça login', 'warn'); document.getElementById('form-servidor').reset(); document.getElementById('modal-servidor').classList.remove('hidden'); document.getElementById('modal-servidor').classList.add('flex'); };
 window.openModalImportCSV = function() { if (!isLoggedIn) return showToast('Faça login', 'warn'); document.getElementById('csv-input').value = ''; document.getElementById('modal-import-csv').classList.remove('hidden'); document.getElementById('modal-import-csv').classList.add('flex'); };
 
-// Nova Função Global: Excluir Servidor
 window.deleteServidor = async function(id) {
   if (!isLoggedIn) return;
   if(confirm("ATENÇÃO: Tem certeza que deseja excluir permanentemente este servidor? Ele aparecerá como 'Removido' nas portarias vinculadas.")) {
@@ -244,12 +250,11 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 // ==========================================
 // RENDERIZAÇÃO NA TELA
 // ==========================================
-function renderPortarias() {
+window.renderPortarias = function() {
   const list = document.getElementById('portaria-list');
   let filtered = portarias.filter(p => {
-    // Nova lógica de Filtro: Aba Revogadas vs Abas Ativas
     if (currentFilter === 'revogada') return p.status === 'revogada';
-    if (p.status === 'revogada') return false; // Oculta revogadas de "Todas, Vigentes, A Vencer"
+    if (p.status === 'revogada') return false; 
 
     const s = getStatus(p.data_validade);
     if (currentFilter !== 'all' && s.key !== currentFilter) return false;
@@ -262,7 +267,6 @@ function renderPortarias() {
   
   filtered.sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   
-  // Atualiza os contadores no topo (ignora revogadas)
   let ok = 0, warn = 0, exp = 0;
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
@@ -295,7 +299,7 @@ function renderPortarias() {
   if(window.lucide) lucide.createIcons();
 }
 
-function renderServidores() {
+window.renderServidores = function() {
   const list = document.getElementById('servidor-list');
   const empty = document.getElementById('servidor-empty');
   if (servidores.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
@@ -316,7 +320,6 @@ function renderServidores() {
   if(window.lucide) lucide.createIcons();
 }
 
-// ... Mantido restante do Relatório, Detalhes e CSV iguais à versão anterior ...
 window.openDetailPortaria = function(id) {
   const p = portarias.find(r => r.__backendId === id);
   if (!p) return;
@@ -340,22 +343,19 @@ window.openDetailPortaria = function(id) {
   `;
   document.getElementById('modal-detail-portaria').classList.remove('hidden'); document.getElementById('modal-detail-portaria').classList.add('flex');
   
-  // Oculta botão de revogar se já estiver revogada
   document.getElementById('btn-edit-portaria').style.display = (isLoggedIn && p.status !== 'revogada') ? 'flex' : 'none';
   document.getElementById('btn-revoke-portaria').style.display = (isLoggedIn && p.status !== 'revogada') ? 'flex' : 'none';
 }
 
-// Editar portaria
 document.getElementById('btn-edit-portaria').addEventListener('click', () => { 
   if (viewingPortaria) {
     window.closeDetailPortaria(); 
     window.openModalPortaria(viewingPortaria); 
   } else {
-    showToast('Erro ao carregar dados da portaria.', 'error');
+    showToast('Erro ao carregar dados.', 'error');
   }
 });
 
-// Revogar portaria
 document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
   if (!viewingPortaria || !isLoggedIn) return;
   try { await updateDoc(doc(db, "portarias", viewingPortaria.__backendId), { status: 'revogada' }); window.closeDetailPortaria(); showToast('Portaria revogada!'); } 
@@ -366,12 +366,11 @@ document.getElementById('btn-revoke-portaria').addEventListener('click', async (
 // RELATÓRIOS
 // ==========================================
 window.renderRelatorios = function() {
-  // 1. Relatório de Servidores
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   
   portarias.forEach(p => {
-    if (p.status === 'revogada') return; // Horas de revogadas não contam
+    if (p.status === 'revogada') return; 
     const binding = JSON.parse(p.servidores || '{}');
     Object.keys(binding).forEach(srvId => { 
       srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; 
@@ -399,11 +398,10 @@ window.renderRelatorios = function() {
     `).join('');
   }
 
-  // 2. Relatório de Portarias (Incluindo Revogadas)
   const vigentes = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const aVencer = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
   const vencidas = portarias.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort((a, b) => getStatus(b.data_validade).days - getStatus(a.data_validade).days);
-  const revogadas = portarias.filter(p => p.status === 'revogada'); // Filtro novo!
+  const revogadas = portarias.filter(p => p.status === 'revogada'); 
 
   document.getElementById('stat-port-vigentes').textContent = vigentes.length; 
   document.getElementById('stat-port-vencer').textContent = aVencer.length; 
@@ -412,6 +410,7 @@ window.renderRelatorios = function() {
 
   const renderPortariaList = (arr, divId) => {
     const div = document.getElementById(divId);
+    if (!div) return;
     if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200 col-span-full">Nenhuma portaria nesta categoria</p>'; } else {
       div.innerHTML = arr.map(p => {
         const isRevogada = p.status === 'revogada';
@@ -438,15 +437,8 @@ window.renderRelatorios = function() {
   renderPortariaList(vigentes, 'relatorio-vigentes'); 
   renderPortariaList(aVencer, 'relatorio-vencer'); 
   renderPortariaList(vencidas, 'relatorio-vencidas');
-  renderPortariaList(revogadas, 'relatorio-revogadas'); // Renderiza as revogadas na nova aba!
+  renderPortariaList(revogadas, 'relatorio-revogadas'); 
   if(window.lucide) lucide.createIcons();
-}
-
-// Chamar função principal ao carregar os dados
-const originalRenderPortarias = renderPortarias;
-renderPortarias = function() {
-  originalRenderPortarias();
-  renderRelatorios(); // Garante que relatórios sempre atualizam com as portarias
 }
 
 // ==========================================
@@ -458,11 +450,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'bg-blue-50', 'text-accent'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
     
-    // Estilo especial do menu lateral ativo
     btn.classList.add('active', 'bg-blue-50', 'text-accent'); 
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
     
-    if (tab.startsWith('rel-')) renderRelatorios(); // Recarrega se for uma aba de relatório
+    if (tab.startsWith('rel-')) renderRelatorios(); 
     if(window.lucide) lucide.createIcons();
   });
 });
@@ -482,11 +473,9 @@ document.querySelectorAll('.tab-rel-btn').forEach(btn => {
   });
 });
 
-// Botões Ativos
 document.getElementById('btn-new-portaria').addEventListener('click', (e) => { e.preventDefault(); window.openModalPortaria(); });
 document.getElementById('btn-new-servidor').addEventListener('click', (e) => { e.preventDefault(); window.openModalServidor(); });
 document.getElementById('btn-import-csv').addEventListener('click', (e) => { e.preventDefault(); window.openModalImportCSV(); });
-document.getElementById('btn-process-csv').addEventListener('click', (e) => { e.preventDefault(); processCSVImport(); });
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -558,9 +547,7 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
       statusText = s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida';
     }
     
-    // Tratamento para evitar quebras no CSV caso tenha aspas na descrição
     const descTratada = (p.descricao || '').replace(/"/g, '""');
-    
     csv.push(`"${p.numero}","${descTratada}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`);
   });
   
@@ -568,6 +555,6 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
   showToast('Download iniciado!', 'success');
 });
 
-// Renderização inicial da interface do usuário
+// Inicialização da interface do usuário
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
