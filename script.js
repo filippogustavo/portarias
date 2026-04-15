@@ -371,7 +371,7 @@ window.renderServidores = function() {
       ${isLoggedIn ? `
         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
           <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors">
-            <i data-lucide="square-pen" style="width:18px;height:18px;"></i>
+            <i data-lucide="pencil" style="width:18px;height:18px;"></i>
           </button>
           <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
             <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
