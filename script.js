@@ -503,29 +503,26 @@ window.renderRelatorios = function() {
     if (!div) return;
     
     if (arr.length === 0) { 
-      div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">Nenhuma portaria nesta categoria</p>'; 
+      div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-white rounded-xl border border-slate-200 text-center shadow-sm">Nenhuma portaria nesta categoria</p>'; 
     } else {
       div.innerHTML = arr.map(p => {
         const isRevogada = p.status === 'revogada';
         const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
         
-        // 1. Criar as Tags Visuais (Tipo e Link)
         const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
-        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
 
-        // 2. Mapear e listar os servidores individualmente
         const binding = JSON.parse(p.servidores || '{}');
         const srvList = Object.keys(binding).length > 0 
           ? Object.keys(binding).map(srvId => { 
               const srv = servidores.find(serv => serv.__backendId === srvId); 
-              return `<span class="inline-block px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 shadow-sm">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1">(${binding[srvId]}h)</strong></span>`; 
+              return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
             }).join('')
           : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
         
-        // 3. Montar o Painel Completo (Sem ser botão clicável)
         return `
-          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm ${isRevogada ? 'opacity-70 grayscale' : ''}">
-            <div class="flex flex-col md:flex-row md:items-start justify-between gap-5">
+          <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow ${isRevogada ? 'opacity-70 grayscale' : ''}">
+            <div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
               
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-3 mb-2 flex-wrap">
@@ -533,10 +530,10 @@ window.renderRelatorios = function() {
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                 </div>
-                <p class="text-slate-600 text-sm mb-4">${p.descricao}</p>
+                <p class="text-slate-600 text-sm mb-5">${p.descricao}</p>
 
-                <div class="bg-slate-100/50 p-3 rounded-xl border border-slate-100">
-                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados na Portaria</p>
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Servidores Vinculados na Portaria</p>
                   <div class="flex flex-wrap gap-2">
                     ${srvList}
                   </div>
@@ -544,9 +541,9 @@ window.renderRelatorios = function() {
               </div>
 
               <div class="shrink-0 flex flex-col md:items-end gap-3 border-t md:border-t-0 border-slate-200 pt-4 md:pt-0 min-w-[180px]">
-                <div class="flex flex-row md:flex-col gap-4 md:gap-1 w-full md:text-right bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                <div class="flex flex-row md:flex-col gap-4 md:gap-1 w-full md:text-right bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Pub: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_publicacao)}</strong></p>
-                  <div class="w-full h-px bg-slate-100 hidden md:block my-1"></div>
+                  <div class="w-full h-px bg-slate-200 hidden md:block my-1.5"></div>
                   <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Val: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_validade)}</strong></p>
                 </div>
                 ${linkBtn}
