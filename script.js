@@ -354,14 +354,14 @@ window.renderPortarias = function() {
 window.renderServidores = function() {
   const list = document.getElementById('servidor-list');
   const empty = document.getElementById('servidor-empty');
-  if (!list) return; // Segurança caso a aba esteja invisível
+  if (!list) return; 
   
   if (servidores.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
   
   list.innerHTML = servidores.map(s => `
-    <div class="bg-card border border-slate-200 rounded-2xl p-5 shadow-sm relative group flex justify-between items-center">
-      <div class="flex flex-col gap-1 pr-6 min-w-0">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group flex justify-between items-center transition-all hover:border-slate-300">
+      <div class="flex flex-col gap-1 pr-4 min-w-0">
         <p class="font-bold text-slate-800 text-lg truncate" title="${s.nome}">${s.nome}</p>
         <div class="flex flex-wrap gap-2 mt-2">
           <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${s.segmento}</span>
@@ -369,9 +369,13 @@ window.renderServidores = function() {
         </div>
       </div>
       ${isLoggedIn ? `
-        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button onclick="openModalServidor('${s.__backendId}')" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="edit-2" style="width:18px;height:18px;"></i></button>
-          <button onclick="deleteServidor('${s.__backendId}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
+        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
+          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors">
+            <i data-lucide="edit" style="width:18px;height:18px;"></i>
+          </button>
+          <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+            <i data-lucide="trash-2" style="width:18px;height:18px;"></i>
+          </button>
         </div>
       ` : ''}
     </div>
