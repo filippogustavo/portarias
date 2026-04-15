@@ -63,7 +63,7 @@
             <i data-lucide="file-text" style="width:20px;height:20px;" class="shrink-0"></i> 
             <span class="sidebar-text whitespace-nowrap">Portarias</span>
           </button> 
-          <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="servidores" title="Servidores">
+          <button id="menu-servidores" class="tab-btn sidebar-btn hidden items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="servidores" title="Servidores">
             <i data-lucide="users" style="width:20px;height:20px;" class="shrink-0"></i> 
             <span class="sidebar-text whitespace-nowrap">Servidores</span>
           </button> 
@@ -162,11 +162,19 @@
        
        <div id="tab-rel-servidores" class="tab-content hidden h-full">
         <div class="max-w-6xl mx-auto">
-         <div class="flex items-center justify-between mb-8 border-b border-slate-200 pb-4">
+         
+         <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
           <h2 class="text-2xl font-bold text-slate-800">Relatório: Horas por Servidor</h2>
-          <button id="btn-export-servidores" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm cursor-pointer relative z-10"> 
-            <i data-lucide="download" style="width:16px;height:16px;"></i>Exportar CSV 
-          </button>
+          
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative flex-1 md:w-64">
+              <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;"></i>
+              <input type="text" id="search-rel-srv" placeholder="Buscar servidor..." class="w-full pl-8 py-2 text-sm border border-slate-300 rounded-lg focus:border-accent focus:outline-none transition-colors">
+            </div>
+            <button id="btn-export-servidores" class="px-5 py-2 rounded-lg text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm shrink-0 relative z-10"> 
+              <i data-lucide="download" style="width:16px;height:16px;"></i>Exportar
+            </button>
+          </div>
          </div>
 
          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -186,10 +194,12 @@
           </div>
          </div>
 
-         <div id="relatorio-servidores" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+         <div id="relatorio-servidores" class="space-y-3"></div>
+         
          <div id="relatorio-servidores-empty" class="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-500 font-medium text-sm hidden">
-          Nenhum servidor cadastrado
+          Nenhum servidor encontrado com este nome
          </div>
+         
         </div>
        </div>
 
@@ -286,15 +296,26 @@
       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Número *</label> <input type="text" id="f-portaria-numero" placeholder="001/2026" required></div>
       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Publicação *</label> <input type="date" id="f-portaria-pub" required></div>
      </div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Descrição *</label> <input type="text" id="f-portaria-desc" placeholder="Assunto da portaria" required></div>
      
      <div class="grid grid-cols-2 gap-3">
-       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade *</label> <input type="date" id="f-portaria-validade" required></div>
        <div>
-         <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide text-amber-600">Revoga Portaria Anterior?</label> 
-         <select id="f-portaria-revoga" class="border-amber-200 bg-amber-50 focus:border-amber-400">
-           </select>
+         <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Tipo *</label> 
+         <select id="f-portaria-tipo" required class="w-full bg-white border border-slate-300 rounded-lg p-2.5">
+           <option value="" disabled selected>Selecione...</option>
+           <option value="Fiscalização">Fiscalização</option>
+           <option value="Comissão">Comissão</option>
+           <option value="Diversas">Diversas</option>
+         </select>
        </div>
+       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade *</label> <input type="date" id="f-portaria-validade" required></div>
+     </div>
+
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Descrição *</label> <input type="text" id="f-portaria-desc" placeholder="Assunto da portaria" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Link da Publicação *</label> <input type="url" id="f-portaria-link" placeholder="https://pep.ifsp.edu.br/..." required></div>
+     
+     <div>
+       <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide text-amber-600">Revoga Portaria Anterior?</label> 
+       <select id="f-portaria-revoga" class="border-amber-200 bg-amber-50 focus:border-amber-400 w-full p-2.5 rounded-lg"></select>
      </div>
      
      <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
@@ -319,7 +340,7 @@
   <div id="modal-servidor" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
    <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-md max-h-[90%] overflow-auto fade-in">
     <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 class="font-display text-lg font-bold text-slate-800">Novo Servidor</h2>
+     <h2 id="modal-title-servidor" class="font-display text-lg font-bold text-slate-800">Novo Servidor</h2>
      <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalServidor()"> 
        <i data-lucide="x" style="width:18px;height:18px;"></i> 
      </button>
