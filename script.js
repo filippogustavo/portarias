@@ -239,8 +239,9 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
   } catch (error) { showToast('Erro', 'error'); }
 });
 
+
 // ==========================================
-// ABA PRINCIPAL PORTARIAS (VISÃO ANALÍTICA EXPANDIDA)
+// ABA PRINCIPAL (PORTARIAS ANALÍTICAS)
 // ==========================================
 window.renderPortarias = function() {
   const list = document.getElementById('portaria-list');
@@ -256,7 +257,6 @@ window.renderPortarias = function() {
     return true;
   });
   
-  // ORDENAÇÃO: Data de publicação (Mais recentes no topo)
   filtered.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
   
   let ok = 0, warn = 0, exp = 0;
@@ -323,7 +323,39 @@ window.renderPortarias = function() {
   if(window.lucide) lucide.createIcons();
 }
 
-// JANELA DE DETALHES (Mantida como fallback ao clicar no card da Aba Principal)
+// ==========================================
+// ABA SERVIDORES
+// ==========================================
+window.renderServidores = function() {
+  const list = document.getElementById('servidor-list');
+  const empty = document.getElementById('servidor-empty');
+  if (!list) return; 
+  if (servidores.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  
+  list.innerHTML = servidores.map(s => `
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group flex justify-between items-center transition-all hover:border-slate-300">
+      <div class="flex flex-col gap-1 pr-4 min-w-0">
+        <p class="font-bold text-slate-800 text-lg truncate" title="${s.nome}">${s.nome}</p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${s.segmento}</span>
+          <span class="bg-blue-50 text-accent px-2 py-1 rounded text-xs font-semibold">${s.setor}</span>
+        </div>
+      </div>
+      ${isLoggedIn ? `
+        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
+          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
+          <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+  if(window.lucide) lucide.createIcons();
+}
+
+// ==========================================
+// JANELA DE DETALHES (ABERTA PELO RELATÓRIO)
+// ==========================================
 window.openDetailPortaria = function(id) {
   const p = portarias.find(r => r.__backendId === id);
   if (!p) return;
@@ -366,7 +398,7 @@ document.getElementById('btn-revoke-portaria').addEventListener('click', async (
 });
 
 // ==========================================
-// RELATÓRIOS (COM EXPANSÃO EM ACORDEÃO)
+// RELATÓRIOS (ACORDEÃO E LISTA COMPACTA)
 // ==========================================
 window.toggleServidorPorts = function(id) {
   const el = document.getElementById('expand-srv-' + id);
@@ -374,18 +406,6 @@ window.toggleServidorPorts = function(id) {
   if(el) {
     el.classList.toggle('hidden');
     icon.style.transform = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-  }
-}
-
-window.togglePortariaDetails = function(id) {
-  const el = document.getElementById('expand-port-' + id);
-  const iconDesk = document.getElementById('icon-port-desk-' + id);
-  const iconMob = document.getElementById('icon-port-mob-' + id);
-  if(el) {
-    el.classList.toggle('hidden');
-    const rotate = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-    if(iconDesk) iconDesk.style.transform = rotate;
-    if(iconMob) iconMob.style.transform = rotate;
   }
 }
 
@@ -412,7 +432,6 @@ window.renderRelatorios = function() {
       srvFiltrados = srvFiltrados.filter(s => s.nome.toLowerCase().includes(q));
     }
 
-    // ORDENAÇÃO: Mais horas no topo
     srvFiltrados.sort((a, b) => {
       const hA = srvHoras[a.__backendId] || 0;
       const hB = srvHoras[b.__backendId] || 0;
@@ -462,7 +481,7 @@ window.renderRelatorios = function() {
     }
   }
 
-  // --- Relatório de Portarias (Acordeão) ---
+  // --- Relatório de Portarias (Lista Compacta que abre o Modal de Detalhes) ---
   const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
   let portariasFiltradas = portarias;
   if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
@@ -478,7 +497,7 @@ window.renderRelatorios = function() {
   document.getElementById('stat-port-vencidas').textContent = vencidas.length;
   document.getElementById('stat-port-revogadas').textContent = revogadas.length;
 
-  const renderPortariaListExpandable = (arr, divId) => {
+  const renderPortariaListSmall = (arr, divId) => {
     const div = document.getElementById(divId);
     if (!div) return;
     if (arr.length === 0) { 
@@ -487,61 +506,44 @@ window.renderRelatorios = function() {
       div.innerHTML = arr.map(p => {
         const isRevogada = p.status === 'revogada';
         const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
-        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ml-1">${p.tipo}</span>` : '';
+        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
         
         const binding = JSON.parse(p.servidores || '{}');
-        const srvList = Object.keys(binding).length > 0 
-          ? Object.keys(binding).map(srvId => { 
-              const srv = servidores.find(serv => serv.__backendId === srvId); 
-              return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
-            }).join('')
-          : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
+        const srvCount = Object.keys(binding).length;
+        const msgVence = isRevogada ? 'Desativada' : s.key === 'expired' ? `Vencida há ${Math.abs(s.days)}d` : `Vence: ${formatDate(p.data_validade)}`;
 
-        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-fit mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
+        // Link flutuando à direita (Usa stopPropagation para não abrir a janela de detalhes ao clicar no link)
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors shrink-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Acessar Link</a>` : '';
 
         return `
-          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
-            
-            <div class="flex items-center justify-between gap-3">
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="openDetailPortaria('${p.__backendId}')">
+            <div class="flex items-start justify-between gap-3 mb-3">
               <div class="flex-1 min-w-0">
-                <div class="flex gap-2 items-center flex-wrap">
+                <div class="flex gap-2 items-center flex-wrap mb-1">
                   <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero}</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
-                  <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
                 </div>
-                <p class="text-slate-600 text-sm mt-1 line-clamp-1">${p.descricao}</p>
-              </div>
-              <i id="icon-port-desk-${p.__backendId}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
-            </div>
-
-            <div id="expand-port-${p.__backendId}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
-              <div class="flex flex-col md:flex-row justify-between gap-5">
-                <div class="flex-1">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p>
-                  <div>${srvList}</div>
-                </div>
-                <div class="flex flex-col gap-3 md:items-end shrink-0">
-                  <div class="flex gap-3 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200 w-full md:w-auto">
-                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Publicação</strong> ${formatDate(p.data_publicacao)}</span>
-                    <div class="w-px bg-slate-200"></div>
-                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Validade</strong> ${formatDate(p.data_validade)}</span>
-                  </div>
-                  ${linkBtn}
-                </div>
+                <p class="text-slate-600 text-sm line-clamp-1">${p.descricao}</p>
               </div>
             </div>
-
+            <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+              <div class="flex gap-3 text-xs text-slate-500 font-semibold">
+                <span class="bg-slate-50 px-2.5 py-1 rounded border border-slate-100">${msgVence}</span>
+                <span class="bg-slate-50 px-2.5 py-1 rounded border border-slate-100">${srvCount} serv.</span>
+              </div>
+              ${linkBtn}
+            </div>
           </div>
         `;
       }).join('');
     }
   };
 
-  renderPortariaListExpandable(vigentes, 'relatorio-vigentes'); 
-  renderPortariaListExpandable(aVencer, 'relatorio-vencer'); 
-  renderPortariaListExpandable(vencidas, 'relatorio-vencidas');
-  renderPortariaListExpandable(revogadas, 'relatorio-revogadas'); 
+  renderPortariaListSmall(vigentes, 'relatorio-vigentes'); 
+  renderPortariaListSmall(aVencer, 'relatorio-vencer'); 
+  renderPortariaListSmall(vencidas, 'relatorio-vencidas');
+  renderPortariaListSmall(revogadas, 'relatorio-revogadas'); 
   if(window.lucide) lucide.createIcons();
 }
 
@@ -665,6 +667,5 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
 
-// Inicialização da interface do usuário
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
