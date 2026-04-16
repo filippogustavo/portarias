@@ -257,7 +257,9 @@ window.renderPortarias = function() {
     return true;
   });
   
-  filtered.sort((a, b) => getStatus(a.data_validade).days - getStatus(b.data_validade).days);
+  // ORDENAÇÃO: Data de publicação (Mais recentes no topo)
+  filtered.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+  
   let ok = 0, warn = 0, exp = 0;
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
@@ -285,12 +287,11 @@ window.renderPortarias = function() {
     
     const adminBtns = (isLoggedIn && !isRevogada) ? `
       <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
-        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
+        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="edit" style="width:18px;height:18px;"></i></button>
         <button onclick="revokePortariaDirect('${p.__backendId}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="power-off" style="width:18px;height:18px;"></i></button>
       </div>
     ` : '';
 
-    // Layout Analítico Completo
     return `
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative group ${isRevogada ? 'opacity-70 grayscale' : ''}">
         ${adminBtns}
@@ -423,7 +424,7 @@ window.togglePortariaDetails = function(id) {
 }
 
 window.renderRelatorios = function() {
-  // 1. Relatório de Servidores (Mantido igual, perfeito)
+  // 1. Relatório de Servidores
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   portarias.forEach(p => {
@@ -439,11 +440,19 @@ window.renderRelatorios = function() {
   const srvEmpty = document.getElementById('relatorio-servidores-empty');
   
   if (srvDiv) {
-    let srvFiltrados = servidores;
+    let srvFiltrados = [...servidores]; // Copia os dados para podermos ordenar sem afetar outras telas
     if (searchRelSrvQuery) {
       const q = searchRelSrvQuery.toLowerCase();
-      srvFiltrados = servidores.filter(s => s.nome.toLowerCase().includes(q));
+      srvFiltrados = srvFiltrados.filter(s => s.nome.toLowerCase().includes(q));
     }
+
+    // ORDENAÇÃO: Servidores com mais horas primeiro
+    srvFiltrados.sort((a, b) => {
+      const hA = srvHoras[a.__backendId] || 0;
+      const hB = srvHoras[b.__backendId] || 0;
+      if (hB !== hA) return hB - hA; // Maior quantidade de horas primeiro
+      return a.nome.localeCompare(b.nome); // Ordem alfabética em caso de empate
+    });
 
     if (srvFiltrados.length === 0) { 
       srvDiv.innerHTML = ''; srvEmpty.classList.remove('hidden'); 
@@ -456,6 +465,9 @@ window.renderRelatorios = function() {
           return binding[s.__backendId] !== undefined;
         });
         
+        // Ordena as portarias dentro da lista do servidor também por data
+        linkedPorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+
         const portsHtml = linkedPorts.length > 0 
           ? linkedPorts.map(p => `<div class="text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors px-2 rounded"><strong class="text-slate-800">Nº ${p.numero}</strong> - ${p.descricao}</div>`).join('')
           : '<div class="text-xs text-slate-400 py-2 italic px-2">Nenhuma portaria ativa</div>';
@@ -485,7 +497,92 @@ window.renderRelatorios = function() {
     }
   }
 
-  // 2. Relatório de Portarias (Agora expansível e sem modal)
+  // 2. Relatório de Portarias
+  const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
+  let portariasFiltradas = portarias;
+  if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
+
+  // NOVA ORDENAÇÃO: Data de publicação (Mais recentes no topo)
+  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || '');
+
+  const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescDate);
+  const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescDate);
+  const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescDate);
+  const revogadas = portariasFiltradas.filter(p => p.status === 'revogada').sort(sortDescDate); 
+
+  document.getElementById('stat-port-vigentes').textContent = vigentes.length; 
+  document.getElementById('stat-port-vencer').textContent = aVencer.length; 
+  document.getElementById('stat-port-vencidas').textContent = vencidas.length;
+  document.getElementById('stat-port-revogadas').textContent = revogadas.length;
+
+  const renderPortariaListSmall = (arr, divId) => {
+    const div = document.getElementById(divId);
+    if (!div) return;
+    if (arr.length === 0) { 
+      div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-white rounded-xl border border-slate-200 text-center shadow-sm">Nenhuma portaria encontrada</p>'; 
+    } else {
+      div.innerHTML = arr.map(p => {
+        const isRevogada = p.status === 'revogada';
+        const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
+        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ml-1">${p.tipo}</span>` : '';
+        
+        const binding = JSON.parse(p.servidores || '{}');
+        const srvList = Object.keys(binding).length > 0 
+          ? Object.keys(binding).map(srvId => { 
+              const srv = servidores.find(serv => serv.__backendId === srvId); 
+              return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
+            }).join('')
+          : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
+
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-fit"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
+
+        return `
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
+            
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex gap-2 items-center flex-wrap">
+                  <span class="font-bold text-slate-800 text-lg truncate">Portaria nº ${p.numero}</span>
+                  ${tipoTag}
+                  <span class="status-pill ${s.class}">${s.label}</span>
+                  <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
+                </div>
+                <p class="text-slate-600 text-sm mt-2 line-clamp-1">${p.descricao}</p>
+              </div>
+              <i id="icon-port-desk-${p.__backendId}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
+            </div>
+
+            <div id="expand-port-${p.__backendId}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
+              <div class="flex flex-col md:flex-row justify-between gap-5">
+                <div class="flex-1">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p>
+                  <div class="flex flex-wrap gap-2">${srvList}</div>
+                </div>
+                <div class="flex flex-col gap-3 md:items-end shrink-0">
+                  <div class="flex gap-3 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Publicação</strong> ${formatDate(p.data_publicacao)}</span>
+                    <div class="w-px bg-slate-200"></div>
+                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Validade</strong> ${formatDate(p.data_validade)}</span>
+                  </div>
+                  ${linkBtn}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+  };
+
+  renderPortariaListSmall(vigentes, 'relatorio-vigentes'); 
+  renderPortariaListSmall(aVencer, 'relatorio-vencer'); 
+  renderPortariaListSmall(vencidas, 'relatorio-vencidas');
+  renderPortariaListSmall(revogadas, 'relatorio-revogadas'); 
+  if(window.lucide) lucide.createIcons();
+}
+
+  // 2. Relatório de Portarias
   const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
   let portariasFiltradas = portarias;
   if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
