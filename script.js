@@ -240,7 +240,7 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// ABA PRINCIPAL PORTARIAS (COMPACTA + BOTÕES DIREITA)
+// ABA PRINCIPAL PORTARIAS (VISÃO ANALÍTICA EXPANDIDA)
 // ==========================================
 window.renderPortarias = function() {
   const list = document.getElementById('portaria-list');
@@ -256,7 +256,7 @@ window.renderPortarias = function() {
     return true;
   });
   
-  // ORDENAÇÃO: Mais recentes no topo
+  // ORDENAÇÃO: Data de publicação (Mais recentes no topo)
   filtered.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
   
   let ok = 0, warn = 0, exp = 0;
@@ -274,56 +274,52 @@ window.renderPortarias = function() {
     const isRevogada = p.status === 'revogada';
     const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
     const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
+    const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
+
+    const binding = JSON.parse(p.servidores || '{}');
+    const srvList = Object.keys(binding).length > 0 
+      ? Object.keys(binding).map(srvId => { 
+          const srv = servidores.find(serv => serv.__backendId === srvId); 
+          return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
+        }).join('')
+      : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
     
-    // Botões de Editar/Revogar Flutuando na Direita
+    // Botões de Editar/Revogar Flutuando no canto INFERIOR DIREITO
     const adminBtns = (isLoggedIn && !isRevogada) ? `
-      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl ml-4" onclick="event.stopPropagation()">
+      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
         <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
         <button onclick="revokePortariaDirect('${p.__backendId}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="power-off" style="width:18px;height:18px;"></i></button>
       </div>
     ` : '';
 
     return `
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all cursor-pointer group flex justify-between items-center ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="openDetailPortaria('${p.__backendId}')">
-        <div class="flex-1 min-w-0 pr-4">
-          <div class="flex items-center gap-3 mb-1 flex-wrap">
-            <span class="font-bold text-slate-800 text-lg truncate">Portaria nº ${p.numero}</span>
-            ${tipoTag}
-            <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
-          </div>
-          <p class="text-slate-600 text-sm line-clamp-1">${p.descricao}</p>
-        </div>
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative group ${isRevogada ? 'opacity-70 grayscale' : ''}">
         ${adminBtns}
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 pr-16 md:pr-0">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
+              <h4 class="font-bold text-slate-800 text-lg">Nº ${p.numero}</h4>
+              ${tipoTag}
+              <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
+            </div>
+            <p class="text-slate-600 text-sm mb-5">${p.descricao}</p>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Servidores Vinculados na Portaria</p>
+              <div class="flex flex-wrap gap-2">${srvList}</div>
+            </div>
+          </div>
+          <div class="shrink-0 flex flex-col md:items-end gap-3 border-t md:border-t-0 border-slate-200 pt-4 md:pt-0 min-w-[180px]">
+            <div class="flex flex-row md:flex-col gap-4 md:gap-1 w-full md:text-right bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Pub: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_publicacao)}</strong></p>
+              <div class="w-full h-px bg-slate-200 hidden md:block my-1.5"></div>
+              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Val: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_validade)}</strong></p>
+            </div>
+            ${linkBtn}
+          </div>
+        </div>
       </div>
     `;
   }).join('');
-  if(window.lucide) lucide.createIcons();
-}
-
-window.renderServidores = function() {
-  const list = document.getElementById('servidor-list');
-  const empty = document.getElementById('servidor-empty');
-  if (!list) return; 
-  if (servidores.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
-  empty.classList.add('hidden');
-  
-  list.innerHTML = servidores.map(s => `
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group flex justify-between items-center transition-all hover:border-slate-300">
-      <div class="flex flex-col gap-1 pr-4 min-w-0">
-        <p class="font-bold text-slate-800 text-lg truncate" title="${s.nome}">${s.nome}</p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${s.segmento}</span>
-          <span class="bg-blue-50 text-accent px-2 py-1 rounded text-xs font-semibold">${s.setor}</span>
-        </div>
-      </div>
-      ${isLoggedIn ? `
-        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
-          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
-          <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
   if(window.lucide) lucide.createIcons();
 }
 
