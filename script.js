@@ -285,7 +285,7 @@ window.renderPortarias = function() {
     
     const adminBtns = (isLoggedIn && !isRevogada) ? `
       <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute top-4 right-4">
-        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="edit" style="width:18px;height:18px;"></i></button>
+        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
         <button onclick="revokePortariaDirect('${p.__backendId}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="power-off" style="width:18px;height:18px;"></i></button>
       </div>
     ` : '';
@@ -340,7 +340,7 @@ window.renderServidores = function() {
       </div>
       ${isLoggedIn ? `
         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
-          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="edit" style="width:18px;height:18px;"></i></button>
+          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
           <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
         </div>
       ` : ''}
