@@ -284,8 +284,8 @@ window.renderPortarias = function() {
       : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
     
     const adminBtns = (isLoggedIn && !isRevogada) ? `
-      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute top-4 right-4">
-        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
+      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
+        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="edit" style="width:18px;height:18px;"></i></button>
         <button onclick="revokePortariaDirect('${p.__backendId}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="power-off" style="width:18px;height:18px;"></i></button>
       </div>
     ` : '';
@@ -408,8 +408,22 @@ window.toggleServidorPorts = function(id) {
   }
 }
 
+// NOVA Função para abrir/fechar os detalhes de uma portaria no relatório
+window.togglePortariaDetails = function(id) {
+  const el = document.getElementById('expand-port-' + id);
+  const iconDesk = document.getElementById('icon-port-desk-' + id);
+  const iconMob = document.getElementById('icon-port-mob-' + id);
+  
+  if(el) {
+    el.classList.toggle('hidden');
+    const rotate = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+    if(iconDesk) iconDesk.style.transform = rotate;
+    if(iconMob) iconMob.style.transform = rotate;
+  }
+}
+
 window.renderRelatorios = function() {
-  // 1. Relatório de Servidores (Agora Clicável)
+  // 1. Relatório de Servidores (Mantido igual, perfeito)
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   portarias.forEach(p => {
@@ -436,7 +450,6 @@ window.renderRelatorios = function() {
     } else {
       srvEmpty.classList.add('hidden');
       srvDiv.innerHTML = srvFiltrados.map(s => {
-        // Encontra as portarias deste servidor
         const linkedPorts = portarias.filter(p => {
           if (p.status === 'revogada') return false;
           const binding = JSON.parse(p.servidores || '{}');
@@ -458,12 +471,8 @@ window.renderRelatorios = function() {
                 <p class="text-slate-500 text-xs mt-1 font-medium">${s.segmento} • ${s.setor}</p>
               </div>
               <div class="flex gap-3 shrink-0">
-                <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm">
-                  <i data-lucide="clock" style="width:16px;height:16px;"></i> ${srvHoras[s.__backendId] || 0}h
-                </div>
-                <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm">
-                  <i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.
-                </div>
+                <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm"><i data-lucide="clock" style="width:16px;height:16px;"></i> ${srvHoras[s.__backendId] || 0}h</div>
+                <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
               </div>
             </div>
             <div id="expand-srv-${s.__backendId}" class="hidden mt-4 pt-2 border-t border-slate-100 w-full">
@@ -476,7 +485,7 @@ window.renderRelatorios = function() {
     }
   }
 
-  // 2. Relatório de Portarias (Filtro por Tipo + Estilo Compacto Antigo)
+  // 2. Relatório de Portarias (Agora expansível e sem modal)
   const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
   let portariasFiltradas = portarias;
   if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
@@ -494,26 +503,59 @@ window.renderRelatorios = function() {
   const renderPortariaListSmall = (arr, divId) => {
     const div = document.getElementById(divId);
     if (!div) return;
-    if (arr.length === 0) { div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-white rounded-xl border border-slate-200 text-center shadow-sm">Nenhuma portaria encontrada</p>'; } else {
+    if (arr.length === 0) { 
+      div.innerHTML = '<p class="text-slate-500 text-sm font-medium p-4 bg-white rounded-xl border border-slate-200 text-center shadow-sm">Nenhuma portaria encontrada</p>'; 
+    } else {
       div.innerHTML = arr.map(p => {
         const isRevogada = p.status === 'revogada';
         const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
-        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ml-2">${p.tipo}</span>` : '';
+        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ml-1">${p.tipo}</span>` : '';
         
-        // Estilo Compacto (Antigo da tela inicial)
+        // Mapeia servidores para exibir na parte expandida
+        const binding = JSON.parse(p.servidores || '{}');
+        const srvList = Object.keys(binding).length > 0 
+          ? Object.keys(binding).map(srvId => { 
+              const srv = servidores.find(serv => serv.__backendId === srvId); 
+              return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
+            }).join('')
+          : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
+
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-fit"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
+
+        // Novo Card Expansível
         return `
-          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="openDetailPortaria('${p.__backendId}')">
-            <div class="flex items-start justify-between gap-3">
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
+            
+            <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
                   <span class="font-bold text-slate-800 text-lg truncate">Portaria nº ${p.numero}</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class}">${s.label}</span>
+                  <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
                 </div>
-                <p class="text-slate-600 text-sm mt-2 line-clamp-2">${p.descricao}</p>
+                <p class="text-slate-600 text-sm mt-2 line-clamp-1">${p.descricao}</p>
               </div>
-              <i data-lucide="chevron-right" style="width:20px;height:20px;color:#cbd5e1;" class="shrink-0"></i>
+              <i id="icon-port-desk-${p.__backendId}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
             </div>
+
+            <div id="expand-port-${p.__backendId}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
+              <div class="flex flex-col md:flex-row justify-between gap-5">
+                <div class="flex-1">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p>
+                  <div class="flex flex-wrap gap-2">${srvList}</div>
+                </div>
+                <div class="flex flex-col gap-3 md:items-end shrink-0">
+                  <div class="flex gap-3 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Publicação</strong> ${formatDate(p.data_publicacao)}</span>
+                    <div class="w-px bg-slate-200"></div>
+                    <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Validade</strong> ${formatDate(p.data_validade)}</span>
+                  </div>
+                  ${linkBtn}
+                </div>
+              </div>
+            </div>
+
           </div>
         `;
       }).join('');
@@ -529,7 +571,6 @@ window.renderRelatorios = function() {
 
 // Filtro do Relatório (Ouvinte de Mudança)
 document.getElementById('filter-tipo-rel-portaria')?.addEventListener('change', window.renderRelatorios);
-
 
 // ==========================================
 // EVENTOS E MENUS LATERAL
