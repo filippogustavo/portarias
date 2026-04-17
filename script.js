@@ -337,9 +337,9 @@ window.renderPortarias = function() {
           </div>
           <div class="shrink-0 flex flex-col md:items-end gap-3 border-t md:border-t-0 border-slate-200 pt-4 md:pt-0 min-w-[180px]">
             <div class="flex flex-row md:flex-col gap-4 md:gap-1 w-full md:text-right bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Pub: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_publicacao)}</strong></p>
+              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Publicação: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_publicacao)}</strong></p>
               <div class="w-full h-px bg-slate-200 hidden md:block my-1.5"></div>
-              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Val: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_validade)}</strong></p>
+              <p class="text-xs text-slate-500 uppercase font-bold tracking-wide">Validade: <strong class="text-slate-800 font-black ml-1">${formatDate(p.data_validade)}</strong></p>
             </div>
             ${linkBtn}
           </div>
