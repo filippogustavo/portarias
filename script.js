@@ -1,6 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot 
+  initializeFirestore, // Alterado para suportar cache
+  persistentLocalCache, // Import necessário para cache
+  persistentMultipleTabManager, // Permite cache em várias abas abertas
+  collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
@@ -19,7 +22,12 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+// CONFIGURAÇÃO DE CACHE FIREBASE
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});
+
 const auth = getAuth(app);
 
 let isLoggedIn = false;
@@ -450,7 +458,7 @@ window.togglePortariaDetails = function(id) {
 }
 
 window.renderRelatorios = function() {
-  // --- Relatório de Servidores ---
+  // RELATÓRIO DE SERVIDORES
   const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   
@@ -549,7 +557,7 @@ window.renderRelatorios = function() {
     }
   }
 
-  // --- Relatório de Portarias ---
+  // RELATÓRIO DE PORTARIAS
   const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
   let portariasFiltradas = portarias;
   if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
@@ -753,6 +761,6 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
 
-// Inicialização da interface do usuário
+// INICIALIZAÇÃO DA INTERFACE DO USUÁRIO
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
