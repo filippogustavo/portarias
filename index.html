@@ -46,7 +46,7 @@
       </div>
       <div class="flex items-center gap-3">
         <button id="btn-login" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2"> 
-          <i data-lucide="log-in" style="width:16px;height:16px;"></i> Admin 
+          <i data-lucide="log-in" style="width:16px;height:16px;"></i> Administrador 
         </button> 
         <button id="btn-logout" class="hidden px-4 py-2 rounded-lg text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-2"> 
           <i data-lucide="log-out" style="width:16px;height:16px;"></i> Sair 
@@ -74,11 +74,20 @@
           
           <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="rel-servidores" title="Por Servidor">
             <i data-lucide="bar-chart-2" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Por Servidor</span>
+            <span class="sidebar-text whitespace-nowrap">Servidor</span>
           </button>
           <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="rel-portarias" title="Por Portaria">
             <i data-lucide="pie-chart" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Por Portaria</span>
+            <span class="sidebar-text whitespace-nowrap">Portaria</span>
+          </button>
+         
+          <div class="sidebar-text mt-4 mb-1 px-2">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sistema</p>
+          </div>
+          
+          <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="sobre" title="Sobre">
+            <i data-lucide="info" style="width:20px;height:20px;" class="shrink-0"></i> 
+            <span class="sidebar-text whitespace-nowrap">Sobre</span>
           </button>
         </nav>
       </aside>
@@ -164,7 +173,7 @@
         <div class="max-w-6xl mx-auto">
          
          <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
-          <h2 class="text-2xl font-bold text-slate-800">Relatório: Horas por Servidor</h2>
+          <h2 class="text-2xl font-bold text-slate-800">Relatório: Servidor</h2>
           
           <div class="flex items-center gap-3 w-full md:w-auto">
             <div class="relative flex-1 md:w-64">
@@ -206,7 +215,7 @@
        <div id="tab-rel-portarias" class="tab-content hidden h-full">
         <div class="max-w-6xl mx-auto">
          <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
-          <h2 class="text-2xl font-bold text-slate-800">Relatório: Status das Portarias</h2>
+          <h2 class="text-2xl font-bold text-slate-800">Relatório: Portarias</h2>
           
           <div class="flex flex-row items-center gap-3">
             <select id="filter-tipo-rel-portaria" class="w-48 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
@@ -265,6 +274,40 @@
          <div id="rel-revogadas-content" class="hidden">
           <div id="relatorio-revogadas" class="space-y-4"></div>
          </div>
+
+        </div>
+       </div>
+
+       <div id="tab-sobre" class="tab-content hidden h-full">
+        <div class="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200 p-8 md:p-10 shadow-sm mt-8">
+          
+          <div class="flex items-center gap-5 mb-8 border-b border-slate-100 pb-8">
+            <div class="w-20 h-20 rounded-2xl bg-blue-50 text-accent flex items-center justify-center border border-blue-100 shrink-0">
+              <i data-lucide="book-copy" style="width:40px;height:40px;"></i>
+            </div>
+            <div>
+              <h2 class="text-3xl font-bold text-slate-800 font-display">Controle de Portarias</h2>
+              <p class="text-slate-500 font-medium text-lg mt-1">Versão 1.0.0</p>
+            </div>
+          </div>
+          
+          <div class="space-y-6 text-slate-700 leading-relaxed">
+            <div>
+              <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Desenvolvido por</p>
+              <p class="font-black text-2xl text-slate-800 mb-4">Filippo Gustavo Guinossi de Almeida</p>
+              
+              <ul class="space-y-3 font-medium">
+                <li class="flex items-center gap-3"><i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> Técnico de Laboratório - Área Informática</li>
+                <li class="flex items-center gap-3"><i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> Coordenadoria de Apoio à Direção (CDI-PEP)</li>
+                <li class="flex items-center gap-3"><i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> Coordenadoria de Tecnologia da Informação (CTI-PEP)</li>
+              </ul>
+            </div>
+            
+            <div class="mt-8 pt-8 border-t border-slate-100 flex items-center gap-4">
+              <div class="p-3 bg-green-50 rounded-xl"><i data-lucide="map-pin" class="text-green-600" style="width:24px;height:24px;"></i></div>
+              <p class="font-bold text-slate-800 text-lg">IFSP - Campus Presidente Epitácio</p>
+            </div>
+          </div>
 
         </div>
        </div>
