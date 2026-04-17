@@ -301,7 +301,7 @@ window.renderPortarias = function() {
     const isRevogada = p.status === 'revogada';
     const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
     const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
-    const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
+     ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
 
     const binding = JSON.parse(p.servidores || '{}');
     const srvList = Object.keys(binding).length > 0 
@@ -584,7 +584,7 @@ window.renderRelatorios = function() {
             }).join('')
           : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
 
-        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-fit mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
 
         return `
           <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
