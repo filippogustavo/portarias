@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ==========================================
-// 1. CONFIGURAÇÃO DO FIREBASE
+// CONFIGURAÇÃO DO FIREBASE
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyD47CBTe09nbstXgtJZn5OfZiTRlIcqjII",
@@ -41,7 +41,7 @@ let searchQuery = '';
 let searchRelSrvQuery = '';
 
 // ==========================================
-// 2. AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
+// AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
 // ==========================================
 let inactivityTimer;
 const TEMPO_LIMITE_MINUTOS = 30; 
@@ -274,6 +274,53 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
   } catch (error) { showToast('Erro', 'error'); }
 });
 
+// ==========================================
+// IMPORTAÇÃO DE SERVIDORES VIA CSV
+// ==========================================
+document.getElementById('btn-confirm-import')?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!isLoggedIn) return showToast('Acesso negado!', 'error');
+  
+  const csvText = document.getElementById('csv-input').value.trim();
+  if (!csvText) return showToast('O campo está vazio.', 'warn');
+
+  const btn = e.currentTarget;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = 'Importando...';
+  btn.disabled = true;
+
+  const lines = csvText.split('\n');
+  let successCount = 0;
+
+  for (let line of lines) {
+    const parts = line.split(',');
+    // Verifica se a linha tem as 3 partes (nome, segmento, setor)
+    if (parts.length >= 3) {
+      const nome = parts[0].trim();
+      const segmento = parts[1].trim();
+      const setor = parts[2].trim();
+      
+      if (nome) { // Se o nome existir, cadastra no banco
+        try {
+          await addDoc(collection(db, "servidores"), { nome, segmento, setor });
+          successCount++;
+        } catch (error) {
+          console.error('Erro ao importar linha:', line, error);
+        }
+      }
+    }
+  }
+
+  btn.innerHTML = originalText;
+  btn.disabled = false;
+  window.closeModalImportCSV();
+
+  if (successCount > 0) {
+    showToast(`${successCount} servidores importados com sucesso!`, 'success');
+  } else {
+    showToast('Nenhum dado válido. Verifique se usou vírgulas.', 'error');
+  }
+});
 
 // ==========================================
 // ABA PRINCIPAL (PORTARIAS ANALÍTICAS EXPANDIDAS)
