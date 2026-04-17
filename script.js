@@ -584,7 +584,7 @@ window.renderRelatorios = function() {
             }).join('')
           : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
 
-        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-fit mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
+        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Documento Oficial</a>` : '';
 
         return `
           <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
