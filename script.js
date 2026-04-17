@@ -275,9 +275,9 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// IMPORTAÇÃO DE SERVIDORES VIA CSV
+// IMPORTAÇÃO DE SERVIDORES (EM LOTE)
 // ==========================================
-document.getElementById('btn-confirm-import')?.addEventListener('click', async (e) => {
+document.getElementById('btn-process-csv')?.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!isLoggedIn) return showToast('Acesso negado!', 'error');
   
