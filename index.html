@@ -388,7 +388,7 @@
      </button>
     </div>
     <form id="form-servidor" class="p-5 space-y-4">
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Nome *</label> <input type="text" id="f-servidor-nome" placeholder="João Silva" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Nome *</label> <input type="text" id="f-servidor-nome" required></div>
      <div>
       <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Segmento *</label> 
       <select id="f-servidor-segmento" required>
@@ -398,7 +398,7 @@
        <option value="Discente">Discente</option>
       </select>
      </div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Setor *</label> <input type="text" id="f-servidor-setor" placeholder="TI" required></div>
+     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Setor *</label> <input type="text" id="f-servidor-setor" placeholder="CTI-PEP" required></div>
      <div class="flex gap-3 pt-2">
        <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalServidor()">Cancelar</button> 
        <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Salvar</button>
@@ -438,7 +438,7 @@
     <div class="p-5 space-y-4">
      <div>
       <p class="text-slate-500 text-xs mb-2">Formato: <code class="text-accent bg-blue-50 px-1 py-0.5 rounded text-xs">nome,segmento,setor</code></p>
-      <textarea id="csv-input" placeholder="João Silva,Administrativo,TI&#10;Maria Santos,Operacional,RH&#10;Pedro Costa,Técnico,Manutenção" style="min-height:120px;font-family:monospace;font-size:0.75rem;"></textarea>
+      <textarea id="csv-input" style="min-height:120px;font-family:monospace;font-size:0.75rem;"></textarea>
      </div>
      <div class="flex gap-3">
        <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalImportCSV()">Cancelar</button> 
