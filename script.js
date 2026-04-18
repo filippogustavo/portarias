@@ -44,7 +44,7 @@ let searchRelSrvQuery = '';
 // AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
 // ==========================================
 let inactivityTimer;
-const TEMPO_LIMITE_MINUTOS = 30; 
+const TEMPO_LIMITE_MINUTOS = 5; 
 const INACTIVITY_TIME_MS = TEMPO_LIMITE_MINUTOS * 60 * 1000; 
 
 function resetInactivityTimer() {
