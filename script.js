@@ -380,7 +380,7 @@ window.renderPortarias = function() {
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 pr-16 md:pr-0">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
-              <h4 class="font-bold text-slate-800 text-lg">Nº ${p.numero}</h4>
+              <h4 class="font-bold text-slate-800 text-lg">Nº ${p.numero} - DRG/PEP/IFSP</h4>
               ${tipoTag}
               <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
             </div>
@@ -647,7 +647,7 @@ window.renderRelatorios = function() {
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
-                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero}</span>
+                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero} - DRG/PEP/IFSP</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                   <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
