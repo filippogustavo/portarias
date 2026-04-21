@@ -589,7 +589,7 @@ window.renderRelatorios = function() {
               </div>
               <div class="flex gap-3 shrink-0">
                 <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm"><i data-lucide="clock" style="width:16px;height:16px;"></i> ${srvHoras[s.__backendId] || 0}h</div>
-                <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-input" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
+                <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
               </div>
             </div>
             
