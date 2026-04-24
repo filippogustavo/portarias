@@ -652,7 +652,7 @@ window.renderRelatorios = function() {
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
-                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero}</span>
+                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero} - DRG/PEP/IFSP</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                   <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
