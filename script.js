@@ -510,7 +510,9 @@ window.renderRelatorios = function() {
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   
   portarias.forEach(p => {
-    if (p.status === 'revogada') return; 
+    // IGNORA VENCIDAS E REVOGADAS NA SOMA DE HORAS!
+    if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return; 
+    
     const binding = JSON.parse(p.servidores || '{}');
     Object.keys(binding).forEach(srvId => { 
       srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; 
@@ -550,11 +552,12 @@ window.renderRelatorios = function() {
           return binding[s.__backendId] !== undefined;
         });
         
-        const activePorts = allLinkedPorts.filter(p => p.status !== 'revogada');
-        const revokedPorts = allLinkedPorts.filter(p => p.status === 'revogada');
+        // Separação Inteligente para a Sanfona
+        const activePorts = allLinkedPorts.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key !== 'expired');
+        const inactivePorts = allLinkedPorts.filter(p => p.status === 'revogada' || getStatus(p.data_validade).key === 'expired');
 
         activePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
-        revokedPorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+        inactivePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
 
         // HTML das Vigentes (Transformado em Link se houver URL)
         const activeHtml = activePorts.length > 0 
@@ -566,11 +569,13 @@ window.renderRelatorios = function() {
             }).join('')
           : '<div class="text-xs text-slate-400 py-2 italic px-2">Nenhuma portaria ativa</div>';
           
-        // HTML das Revogadas (Transformado em Link se houver URL)
-        const revokedHtml = revokedPorts.length > 0
-          ? `<p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mt-4 mb-1 px-2">Histórico: Portarias Revogadas</p>` + 
-            revokedPorts.map(p => {
-              const inner = `<strong class="text-slate-700">Nº ${p.numero}</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">Revogada</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
+        // HTML do Histórico (Revogadas e Vencidas)
+        const inactiveHtml = inactivePorts.length > 0
+          ? `<p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mt-4 mb-1 px-2">Histórico: Revogadas / Vencidas</p>` + 
+            inactivePorts.map(p => {
+              const isRevogada = p.status === 'revogada';
+              const labelStatus = isRevogada ? 'Revogada' : 'Vencida';
+              const inner = `<strong class="text-slate-700">Nº ${p.numero}</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
               return p.link
                 ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 px-2 rounded bg-slate-50 opacity-80">${inner}</div>`;
@@ -596,7 +601,7 @@ window.renderRelatorios = function() {
             <div id="expand-srv-${s.__backendId}" class="hidden mt-4 pt-2 border-t border-slate-100 w-full" onclick="event.stopPropagation()">
               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 px-2">Portarias Vigentes</p>
               ${activeHtml}
-              ${revokedHtml}
+              ${inactiveHtml}
             </div>
           </div>
         `;
@@ -647,7 +652,7 @@ window.renderRelatorios = function() {
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
-                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero} - DRG/PEP/IFSP</span>
+                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero}</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                   <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
@@ -782,7 +787,8 @@ document.getElementById('btn-export-servidores').addEventListener('click', (e) =
   const srvHoras = {}; const srvPortarias = {};
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   portarias.forEach(p => {
-    if (p.status === 'revogada') return;
+    // TAMBÉM IGNORA AS VENCIDAS NA EXPORTAÇÃO PARA O EXCEL
+    if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return;
     const binding = JSON.parse(p.servidores || '{}');
     Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; });
   });
@@ -803,6 +809,7 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
     const descTratada = (p.descricao || '').replace(/"/g, '""');
     const tipo = p.tipo || 'Não especificado';
     const link = p.link || '';
+    
     csv.push(`"${p.numero}","${descTratada}","${tipo}","${link}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`);
   });
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
