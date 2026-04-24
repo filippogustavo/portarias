@@ -562,7 +562,7 @@ window.renderRelatorios = function() {
         // HTML das Vigentes (Transformado em Link se houver URL)
         const activeHtml = activePorts.length > 0 
           ? activePorts.map(p => {
-              const inner = `<strong class="text-slate-800">Nº ${p.numero}</strong> - ${p.descricao}`;
+              const inner = `<strong class="text-slate-800">Nº ${p.numero} - DRG/PEP/IFSP</strong> - ${p.descricao}`;
               return p.link 
                 ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 hover:bg-blue-50 hover:text-blue-700 transition-colors px-2 rounded cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 px-2 rounded">${inner}</div>`;
@@ -575,7 +575,7 @@ window.renderRelatorios = function() {
             inactivePorts.map(p => {
               const isRevogada = p.status === 'revogada';
               const labelStatus = isRevogada ? 'Revogada' : 'Vencida';
-              const inner = `<strong class="text-slate-700">Nº ${p.numero}</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
+              const inner = `<strong class="text-slate-700">Nº ${p.numero} - DRG/PEP/IFSP</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
               return p.link
                 ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 px-2 rounded bg-slate-50 opacity-80">${inner}</div>`;
