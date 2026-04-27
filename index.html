@@ -371,9 +371,17 @@
      </div>
      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Link da Publicação *</label> <input type="url" id="f-portaria-link" placeholder="https://pep.ifsp.edu.br/..." required></div>
      
-     <div>
-       <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide text-amber-600">Revoga Portaria Anterior?</label> 
-       <select id="f-portaria-revoga" class="border-amber-200 bg-amber-50 focus:border-amber-400 w-full p-2.0 rounded-lg"></select>
+     <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-3">
+       <label class="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2 block">Revogar Portaria Anterior?</label>
+       
+       <div class="relative mb-2">
+         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400" style="width:14px;height:14px;"></i>
+         <input type="text" id="f-search-revoga" placeholder="Digite o número da portaria para filtrar..." 
+                class="w-full pl-9 py-1.5 text-xs border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-200 outline-none transition-all">
+       </div>
+
+       <select id="f-portaria-revoga" class="border-amber-200 bg-white focus:border-amber-400 w-full p-2 text-sm rounded-lg outline-none cursor-pointer"></select>
+       <p class="text-[10px] text-amber-500 mt-1 italic">* Caso esta nova portaria substitua uma antiga, selecione-a acima.</p>
      </div>
      
      <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
