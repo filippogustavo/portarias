@@ -102,6 +102,7 @@
             <i data-lucide="plus" style="width:16px;height:16px;"></i>Nova Portaria
           </div>
          </div>
+         
          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm">
            <p class="text-muted text-xs uppercase tracking-wider font-bold">Total</p>
@@ -123,11 +124,20 @@
            <p id="stat-expired" class="text-3xl font-black mt-1 text-red-600">0</p>
           </div>
          </div>
+         
          <div class="flex flex-wrap gap-3 mb-6 items-center">
           <div class="relative flex-1 min-w-[250px]">
            <i data-lucide="search" style="width:18px;height:18px;position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#64748b;"></i> 
-           <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:42px; border-radius: 12px; padding-top: 12px; padding-bottom: 12px;">
+           <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:42px; border-radius: 12px; padding-top: 12px; padding-bottom: 12px; width: 100%; border: 1px solid #cbd5e1; outline: none;" class="focus:border-accent">
           </div>
+          
+          <select id="filter-ano-portaria" class="px-4 py-3 text-sm font-bold border border-slate-300 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer shadow-sm h-[50px]">
+            <option value="Todas">Todos os Anos</option>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+
           <div class="flex gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
            <button data-filter="all" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm whitespace-nowrap">Todas Ativas</button> 
            <button data-filter="ok" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">Vigentes</button> 
@@ -136,6 +146,7 @@
            <div class="w-px bg-slate-200 mx-1 my-1"></div> <button data-filter="revogada" class="filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-red-600 hover:bg-red-50 whitespace-nowrap">Revogadas</button>
           </div>
          </div>
+         
          <div id="portaria-list" class="space-y-4"></div>
          <div id="empty-state" class="text-center py-20 hidden bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
           <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
@@ -218,6 +229,14 @@
           <h2 class="text-2xl font-bold text-slate-800">Relatório: Portaria</h2>
           
           <div class="flex flex-row items-center gap-3">
+            
+            <select id="filter-ano-rel-portaria" class="w-40 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
+              <option value="Todas">Todos os Anos</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+
             <select id="filter-tipo-rel-portaria" class="w-48 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
               <option value="Todas">Todas (Tipos)</option>
               <option value="Fiscalização">Fiscalização</option>
