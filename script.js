@@ -23,7 +23,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// CONFIGURAÇÃO DE CACHE FIREBASE
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
 });
@@ -107,7 +106,6 @@ function showToast(msg, type = 'success') {
 }
 
 function getStatus(dateStr) {
-  // LÓGICA: Se não tem data, o status é Indeterminado (permanente) - key 'ok' mantém na aba Vigentes
   if (!dateStr) return { label: 'Indeterminada', class: 'status-permanent', days: 9999, key: 'ok' };
   
   const today = new Date(); today.setHours(0,0,0,0);
@@ -125,20 +123,17 @@ function formatPortariaNum(num) {
   return `Nº ${n} - DRG/PEP/IFSP`;
 }
 
-// --- NOVA FUNÇÃO DE FILTRO PARA A REVOGAÇÃO ---
 function renderRevogaOptions(query = '') {
   const select = document.getElementById('f-portaria-revoga');
   if (!select) return;
 
   const q = query.toLowerCase();
   
-  // Pega as disponíveis (não revogadas e não a mesma que está sendo editada)
   let disponiveis = portarias.filter(p => 
     p.status !== 'revogada' && 
     (!editingPortaria || p.__backendId !== editingPortaria.__backendId)
   );
 
-  // Filtra pelo que foi digitado
   if (q) {
     disponiveis = disponiveis.filter(p => 
       (p.numero || '').toLowerCase().includes(q) || 
@@ -146,7 +141,6 @@ function renderRevogaOptions(query = '') {
     );
   }
 
-  // Ordena as mais recentes primeiro
   disponiveis.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
 
   let html = '<option value="">-- Nenhuma --</option>';
@@ -158,11 +152,9 @@ function renderRevogaOptions(query = '') {
   select.innerHTML = html;
 }
 
-// Escuta a digitação no campo de busca de revogação
 document.getElementById('f-search-revoga')?.addEventListener('input', (e) => {
   renderRevogaOptions(e.target.value);
 });
-// ----------------------------------------------
 
 
 // ==========================================
@@ -203,7 +195,6 @@ window.openModalPortaria = function(portaria = null) {
   editingPortaria = portaria;
   document.getElementById('modal-title-portaria').textContent = portaria ? 'Editar Portaria' : 'Nova Portaria';
   
-  // Limpa o campo de busca e carrega as opções atualizadas do combobox
   const searchRevoga = document.getElementById('f-search-revoga');
   if (searchRevoga) searchRevoga.value = '';
   renderRevogaOptions();
@@ -352,28 +343,54 @@ document.getElementById('btn-process-csv')?.addEventListener('click', async (e) 
 // ==========================================
 window.renderPortarias = function() {
   const list = document.getElementById('portaria-list');
+  const anoF = document.getElementById('filter-ano-portaria')?.value || 'Todas'; // Filtro de Ano
+
   let filtered = portarias.filter(p => {
-    if (currentFilter === 'revogada') return p.status === 'revogada';
-    if (p.status === 'revogada') return false; 
-    const s = getStatus(p.data_validade);
-    if (currentFilter !== 'all' && s.key !== currentFilter) return false;
+    // 1. Filtro de Status
+    if (currentFilter === 'revogada') {
+       if (p.status !== 'revogada') return false;
+    } else {
+       if (p.status === 'revogada') return false; 
+       const s = getStatus(p.data_validade);
+       if (currentFilter !== 'all' && s.key !== currentFilter) return false;
+    }
+
+    // 2. Filtro de Ano (Lê a data de publicação)
+    if (anoF !== 'Todas') {
+      const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
+      if (pYear !== anoF) return false;
+    }
+
+    // 3. Filtro de Busca (Lupa)
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (p.numero||'').toLowerCase().includes(q) || (p.descricao||'').toLowerCase().includes(q);
     }
+    
     return true;
   });
   
   filtered.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
   
-  let ok = 0, warn = 0, exp = 0;
+  // Atualiza as Badges respeitando o ano selecionado
+  let ok = 0, warn = 0, exp = 0, total = 0;
   portarias.forEach(p => {
     if (p.status === 'revogada') return;
+    
+    if (anoF !== 'Todas') {
+      const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
+      if (pYear !== anoF) return;
+    }
+
     const s = getStatus(p.data_validade);
     if (s.key === 'ok') ok++; else if (s.key === 'warn') warn++; else exp++;
   });
   
-  document.getElementById('stat-total').textContent = ok + warn + exp; document.getElementById('stat-ok').textContent = ok; document.getElementById('stat-warn').textContent = warn; document.getElementById('stat-expired').textContent = exp;
+  document.getElementById('stat-total').textContent = ok + warn + exp; 
+  document.getElementById('stat-ok').textContent = ok; 
+  document.getElementById('stat-warn').textContent = warn; 
+  document.getElementById('stat-expired').textContent = exp;
+
   if (filtered.length === 0) { list.innerHTML = ''; document.getElementById('empty-state').classList.remove('hidden'); return; }
   document.getElementById('empty-state').classList.add('hidden');
 
@@ -620,10 +637,22 @@ window.renderRelatorios = function() {
 
   // RELATÓRIO DE PORTARIAS
   const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
-  let portariasFiltradas = portarias;
-  if (filterTipo !== 'Todas') { portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); }
+  const filterAnoRel = document.getElementById('filter-ano-rel-portaria')?.value || 'Todas'; // NOVO: Filtro Ano
 
-  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || '');
+  let portariasFiltradas = portarias;
+  
+  if (filterTipo !== 'Todas') { 
+    portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); 
+  }
+  
+  if (filterAnoRel !== 'Todas') {
+    portariasFiltradas = portariasFiltradas.filter(p => {
+      const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
+      return pYear === filterAnoRel;
+    });
+  }
+
+  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
   const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescDate);
   const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescDate);
   const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescDate);
@@ -762,6 +791,11 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 
 document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; renderPortarias(); });
 document.getElementById('search-rel-srv')?.addEventListener('input', (e) => { searchRelSrvQuery = e.target.value; window.renderRelatorios(); });
+
+// ESCUTADORES DOS NOVOS FILTROS DE ANO
+document.getElementById('filter-ano-portaria')?.addEventListener('change', window.renderPortarias);
+document.getElementById('filter-ano-rel-portaria')?.addEventListener('change', window.renderRelatorios);
+document.getElementById('filter-tipo-rel-portaria')?.addEventListener('change', window.renderRelatorios);
 
 function downloadCSV(filename, data) { 
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); 
