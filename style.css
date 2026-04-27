@@ -69,7 +69,7 @@ select {
 /* Fundo Modal Claro e Desfocado */
 .overlay-bg { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(6px); }
 
-/* Scrollbar Bonita */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -95,3 +95,6 @@ select {
 /* Botões de Aba Secundários (Relatórios) */
 .tab-rel-btn { cursor: pointer; transition: all 0.2s; }
 .tab-rel-btn.active { background: #eff6ff !important; color: #1d4ed8 !important; }
+
+/* Status Portaria Indeterminada */
+.status-permanent { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
