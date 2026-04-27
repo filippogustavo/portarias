@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
-  initializeFirestore, // Alterado para suportar cache
-  persistentLocalCache, // Import necessário para cache
-  persistentMultipleTabManager, // Permite cache em várias abas abertas
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager, 
   collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ==========================================
-// CONFIGURAÇÃO DO FIREBASE
+// 1. CONFIGURAÇÃO DO FIREBASE
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyD47CBTe09nbstXgtJZn5OfZiTRlIcqjII",
@@ -41,7 +41,7 @@ let searchQuery = '';
 let searchRelSrvQuery = '';
 
 // ==========================================
-// AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
+// 2. AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
 // ==========================================
 let inactivityTimer;
 const TEMPO_LIMITE_MINUTOS = 5; 
@@ -93,7 +93,11 @@ function updateAdminUI() {
   }
 }
 
-function formatDate(d) { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; }
+function formatDate(d) { 
+  if (!d) return 'Indeterminada'; 
+  const [y, m, day] = d.split('-'); 
+  return `${day}/${m}/${y}`; 
+}
 
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
@@ -103,6 +107,9 @@ function showToast(msg, type = 'success') {
 }
 
 function getStatus(dateStr) {
+  // NOVA LÓGICA: Se não tem data, o status é Indeterminado (permanente)
+  if (!dateStr) return { label: 'Indeterminada', class: 'status-permanent', days: 9999, key: 'ok' };
+  
   const today = new Date(); today.setHours(0,0,0,0);
   const val = new Date(dateStr + 'T00:00:00');
   const diff = Math.ceil((val - today) / (1000*60*60*24));
@@ -280,46 +287,20 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 document.getElementById('btn-process-csv')?.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!isLoggedIn) return showToast('Acesso negado!', 'error');
-  
   const csvText = document.getElementById('csv-input').value.trim();
   if (!csvText) return showToast('O campo está vazio.', 'warn');
-
   const btn = e.currentTarget;
-  const originalText = btn.innerHTML;
-  btn.innerHTML = 'Importando...';
-  btn.disabled = true;
-
-  const lines = csvText.split('\n');
-  let successCount = 0;
-
+  btn.innerHTML = 'Importando...'; btn.disabled = true;
+  const lines = csvText.split('\n'); let successCount = 0;
   for (let line of lines) {
     const parts = line.split(',');
-    // Verifica se a linha tem as 3 partes (nome, segmento, setor)
     if (parts.length >= 3) {
-      const nome = parts[0].trim();
-      const segmento = parts[1].trim();
-      const setor = parts[2].trim();
-      
-      if (nome) { // Se o nome existir, cadastra no banco
-        try {
-          await addDoc(collection(db, "servidores"), { nome, segmento, setor });
-          successCount++;
-        } catch (error) {
-          console.error('Erro ao importar linha:', line, error);
-        }
-      }
+      const nome = parts[0].trim(); const segmento = parts[1].trim(); const setor = parts[2].trim();
+      if (nome) { try { await addDoc(collection(db, "servidores"), { nome, segmento, setor }); successCount++; } catch (e) {} }
     }
   }
-
-  btn.innerHTML = originalText;
-  btn.disabled = false;
-  window.closeModalImportCSV();
-
-  if (successCount > 0) {
-    showToast(`${successCount} servidores importados com sucesso!`, 'success');
-  } else {
-    showToast('Nenhum dado válido. Verifique se usou vírgulas.', 'error');
-  }
+  btn.innerHTML = 'Importar'; btn.disabled = false; window.closeModalImportCSV();
+  if (successCount > 0) showToast(`${successCount} servidores importados!`, 'success');
 });
 
 // ==========================================
@@ -356,7 +337,7 @@ window.renderPortarias = function() {
     const isRevogada = p.status === 'revogada';
     const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
     const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
-    const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
+    const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
 
     const binding = JSON.parse(p.servidores || '{}');
     const srvList = Object.keys(binding).length > 0 
@@ -366,7 +347,6 @@ window.renderPortarias = function() {
         }).join('')
       : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
     
-    // Botões de Editar/Revogar Flutuando no canto INFERIOR DIREITO
     const adminBtns = (isLoggedIn && !isRevogada) ? `
       <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
         <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
@@ -457,10 +437,9 @@ window.openDetailPortaria = function(id) {
     <div><span class="status-pill ${s.class}">${s.label}</span></div>
     <p class="text-slate-800 font-medium mt-2 text-lg">${p.descricao}</p>
     ${linkHtml}
-    <div class="grid grid-cols-3 gap-3 text-sm mt-5">
-      <div class="bg-slate-50 border border-slate-100 rounded-lg p-3 col-span-1">${tipoHtml}</div>
-      <div class="bg-slate-50 border border-slate-100 rounded-lg p-3"><p class="text-slate-500 text-xs font-bold uppercase mb-1">Publicação</p><p class="text-slate-800 font-medium">${formatDate(p.data_publicacao)}</p></div>
-      <div class="bg-slate-50 border border-slate-100 rounded-lg p-3"><p class="text-slate-500 text-xs font-bold uppercase mb-1">Validade</p><p class="text-slate-800 font-medium">${formatDate(p.data_validade)}</p></div>
+    <div class="grid grid-cols-2 gap-3 text-sm mt-5">
+      <div class="bg-slate-50 p-3 rounded-lg"><p class="text-slate-500 text-[10px] uppercase font-bold">Publicação</p><p class="text-slate-800 font-medium">${formatDate(p.data_publicacao)}</p></div>
+      <div class="bg-slate-50 p-3 rounded-lg"><p class="text-slate-500 text-[10px] uppercase font-bold">Validade</p><p class="text-slate-800 font-medium">${formatDate(p.data_validade)}</p></div>
     </div>
     <div class="mt-5"><p class="text-slate-500 text-xs mb-2 uppercase font-bold tracking-wide">Servidores Vinculados</p><div>${srvList}</div></div>
   `;
@@ -479,7 +458,6 @@ document.getElementById('btn-revoke-portaria').addEventListener('click', async (
   catch (error) { showToast('Erro', 'error'); }
 });
 
-
 // ==========================================
 // RELATÓRIOS (COM HISTÓRICO CLICÁVEL)
 // ==========================================
@@ -495,12 +473,10 @@ window.toggleServidorPorts = function(id) {
 window.togglePortariaDetails = function(id) {
   const el = document.getElementById('expand-port-' + id);
   const iconDesk = document.getElementById('icon-port-desk-' + id);
-  const iconMob = document.getElementById('icon-port-mob-' + id);
   if(el) {
     el.classList.toggle('hidden');
     const rotate = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
     if(iconDesk) iconDesk.style.transform = rotate;
-    if(iconMob) iconMob.style.transform = rotate;
   }
 }
 
@@ -510,7 +486,7 @@ window.renderRelatorios = function() {
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   
   portarias.forEach(p => {
-    // IGNORA VENCIDAS E REVOGADAS NA SOMA DE HORAS!
+    // IGNORA APENAS AS VENCIDAS (AS INDETERMINADAS CONTINUAM VIGENTES)
     if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return; 
     
     const binding = JSON.parse(p.servidores || '{}');
@@ -534,12 +510,7 @@ window.renderRelatorios = function() {
       srvFiltrados = srvFiltrados.filter(s => s.nome.toLowerCase().includes(q));
     }
 
-    srvFiltrados.sort((a, b) => {
-      const hA = srvHoras[a.__backendId] || 0;
-      const hB = srvHoras[b.__backendId] || 0;
-      if (hB !== hA) return hB - hA; 
-      return a.nome.localeCompare(b.nome);
-    });
+    srvFiltrados.sort((a, b) => (srvHoras[b.__backendId] || 0) - (srvHoras[a.__backendId] || 0));
 
     if (srvFiltrados.length === 0) { 
       srvDiv.innerHTML = ''; srvEmpty.classList.remove('hidden'); 
@@ -552,14 +523,13 @@ window.renderRelatorios = function() {
           return binding[s.__backendId] !== undefined;
         });
         
-        // Separação Inteligente para a Sanfona
+        // Separação Inteligente: Ativas (Vigentes + Indeterminadas) e Inativas (Revogadas + Vencidas)
         const activePorts = allLinkedPorts.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key !== 'expired');
         const inactivePorts = allLinkedPorts.filter(p => p.status === 'revogada' || getStatus(p.data_validade).key === 'expired');
 
         activePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
         inactivePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
 
-        // HTML das Vigentes (Transformado em Link se houver URL)
         const activeHtml = activePorts.length > 0 
           ? activePorts.map(p => {
               const inner = `<strong class="text-slate-800">Nº ${p.numero} - DRG/PEP/IFSP</strong> - ${p.descricao}`;
@@ -569,12 +539,10 @@ window.renderRelatorios = function() {
             }).join('')
           : '<div class="text-xs text-slate-400 py-2 italic px-2">Nenhuma portaria ativa</div>';
           
-        // HTML do Histórico (Revogadas e Vencidas)
         const inactiveHtml = inactivePorts.length > 0
           ? `<p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mt-4 mb-1 px-2">Histórico: Revogadas / Vencidas</p>` + 
             inactivePorts.map(p => {
-              const isRevogada = p.status === 'revogada';
-              const labelStatus = isRevogada ? 'Revogada' : 'Vencida';
+              const labelStatus = p.status === 'revogada' ? 'Revogada' : 'Vencida';
               const inner = `<strong class="text-slate-700">Nº ${p.numero} - DRG/PEP/IFSP</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
               return p.link
                 ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
@@ -597,14 +565,11 @@ window.renderRelatorios = function() {
                 <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
               </div>
             </div>
-            
             <div id="expand-srv-${s.__backendId}" class="hidden mt-4 pt-2 border-t border-slate-100 w-full" onclick="event.stopPropagation()">
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 px-2">Portarias Vigentes</p>
-              ${activeHtml}
-              ${inactiveHtml}
+              <p class="text-[10px] font-bold text-slate-400 uppercase mb-1 px-2">Portarias Vigentes</p>
+              ${activeHtml} ${inactiveHtml}
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
     }
   }
@@ -637,37 +602,29 @@ window.renderRelatorios = function() {
         const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ml-1">${p.tipo}</span>` : '';
         
         const binding = JSON.parse(p.servidores || '{}');
-        const srvList = Object.keys(binding).length > 0 
-          ? Object.keys(binding).map(srvId => { 
-              const srv = servidores.find(serv => serv.__backendId === srvId); 
-              return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
-            }).join('')
-          : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
+        const srvList = Object.keys(binding).map(srvId => { 
+          const srv = servidores.find(serv => serv.__backendId === srvId); 
+          return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? srv.nome : 'Removido'} (${binding[srvId]}h)</span>`; 
+        }).join('') || '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
 
         const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Acessar Documento</a>` : '';
 
         return `
           <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
-            
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
                   <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero} - DRG/PEP/IFSP</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
-                  <i id="icon-port-mob-${p.__backendId}" data-lucide="chevron-down" style="width:18px;height:18px;" class="text-slate-400 transition-transform ml-auto md:hidden"></i>
                 </div>
                 <p class="text-slate-600 text-sm mt-1 line-clamp-1">${p.descricao}</p>
               </div>
               <i id="icon-port-desk-${p.__backendId}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
             </div>
-
             <div id="expand-port-${p.__backendId}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
               <div class="flex flex-col md:flex-row justify-between gap-5">
-                <div class="flex-1">
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p>
-                  <div>${srvList}</div>
-                </div>
+                <div class="flex-1"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p><div>${srvList}</div></div>
                 <div class="flex flex-col gap-3 md:items-end shrink-0">
                   <div class="flex gap-3 text-sm bg-slate-50 p-2.5 rounded-xl border border-slate-200 w-full md:w-auto">
                     <span><strong class="text-slate-500 text-[10px] uppercase block mb-0.5">Publicação</strong> ${formatDate(p.data_publicacao)}</span>
@@ -678,9 +635,7 @@ window.renderRelatorios = function() {
                 </div>
               </div>
             </div>
-
-          </div>
-        `;
+          </div>`;
       }).join('');
     }
   };
@@ -691,9 +646,6 @@ window.renderRelatorios = function() {
   renderPortariaListExpandable(revogadas, 'relatorio-revogadas'); 
   if(window.lucide) lucide.createIcons();
 }
-
-document.getElementById('filter-tipo-rel-portaria')?.addEventListener('change', window.renderRelatorios);
-
 
 // ==========================================
 // EVENTOS E MENUS LATERAL
@@ -734,7 +686,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 document.querySelectorAll('.tab-rel-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const tab = btn.dataset.tabRel;
     document.querySelectorAll('.tab-rel-btn').forEach(b => {
       b.classList.remove('active', 'bg-blue-50', 'text-accent');
       b.classList.add('bg-transparent', 'text-slate-500');
@@ -742,7 +693,7 @@ document.querySelectorAll('.tab-rel-btn').forEach(btn => {
     document.querySelectorAll('[id^="rel-"][id$="-content"]').forEach(c => c.classList.add('hidden'));
     btn.classList.add('active', 'bg-blue-50', 'text-accent');
     btn.classList.remove('bg-transparent', 'text-slate-500');
-    document.getElementById(`rel-${tab}-content`).classList.remove('hidden');
+    document.getElementById(`rel-${btn.dataset.tabRel}-content`).classList.remove('hidden');
   });
 });
 
@@ -768,9 +719,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; renderPortarias(); });
 document.getElementById('search-rel-srv')?.addEventListener('input', (e) => { searchRelSrvQuery = e.target.value; window.renderRelatorios(); });
 
-// ==========================================
-// EXPORTAÇÃO CSV
-// ==========================================
 function downloadCSV(filename, data) { 
   const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); 
   const link = document.createElement('a'); 
@@ -787,7 +735,6 @@ document.getElementById('btn-export-servidores').addEventListener('click', (e) =
   const srvHoras = {}; const srvPortarias = {};
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
   portarias.forEach(p => {
-    // TAMBÉM IGNORA AS VENCIDAS NA EXPORTAÇÃO PARA O EXCEL
     if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return;
     const binding = JSON.parse(p.servidores || '{}');
     Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; });
@@ -800,17 +747,10 @@ document.getElementById('btn-export-servidores').addEventListener('click', (e) =
 document.getElementById('btn-export-portarias').addEventListener('click', (e) => {
   e.preventDefault();
   if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
-  const csv = ['"Número","Descrição","Tipo","Link","Data Publicação","Data Validade","Status","Total Horas Vinculadas"'];
+  const csv = ['"Número","Descrição","Tipo","Link","Data Publicação","Data Validade","Status"'];
   portarias.forEach(p => {
-    const binding = JSON.parse(p.servidores || '{}');
-    const totalHoras = Object.values(binding).reduce((a, b) => a + b, 0);
-    let statusText = 'Revogada';
-    if (p.status !== 'revogada') { const s = getStatus(p.data_validade); statusText = s.key === 'ok' ? 'Vigente' : s.key === 'warn' ? 'A Vencer' : 'Vencida'; }
-    const descTratada = (p.descricao || '').replace(/"/g, '""');
-    const tipo = p.tipo || 'Não especificado';
-    const link = p.link || '';
-    
-    csv.push(`"${p.numero}","${descTratada}","${tipo}","${link}","${p.data_publicacao}","${p.data_validade}","${statusText}",${totalHoras}`);
+    const s = p.status === 'revogada' ? 'Revogada' : getStatus(p.data_validade).label;
+    csv.push(`"${p.numero}","${(p.descricao||'').replace(/"/g,'""')}","${p.tipo}","${p.link}","${p.data_publicacao}","${p.data_validade}","${s}"`);
   });
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
