@@ -23,6 +23,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// CONFIGURAÇÃO DE CACHE FIREBASE
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
 });
@@ -652,7 +653,9 @@ window.renderRelatorios = function() {
     });
   }
 
-  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+  // AQUI ESTAVA O ERRO! (Um parêntese extra no final)
+  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || '');
+  
   const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescDate);
   const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescDate);
   const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescDate);
