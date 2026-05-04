@@ -124,6 +124,20 @@ function formatPortariaNum(num) {
   return `Nº ${n} - DRG/PEP/IFSP`;
 }
 
+// ==========================================
+// FUNÇÃO DE ORDENAÇÃO DECRESCENTE (POR NÚMERO E ANO)
+// ==========================================
+function sortDescNum(a, b) {
+  const nA = (a.numero || '').replace(/\\/g, '/').split('/');
+  const nB = (b.numero || '').replace(/\\/g, '/').split('/');
+  
+  const pA = { num: parseInt(nA[0]) || 0, ano: parseInt(nA[1]) || 0 };
+  const pB = { num: parseInt(nB[0]) || 0, ano: parseInt(nB[1]) || 0 };
+  
+  if (pA.ano !== pB.ano) return pB.ano - pA.ano; // Anos maiores primeiro
+  return pB.num - pA.num; // Números maiores primeiro
+}
+
 function renderRevogaOptions(query = '') {
   const select = document.getElementById('f-portaria-revoga');
   if (!select) return;
@@ -142,7 +156,8 @@ function renderRevogaOptions(query = '') {
     );
   }
 
-  disponiveis.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+  // Ordenando de forma decrescente matemática
+  disponiveis.sort(sortDescNum);
 
   let html = '<option value="">-- Nenhuma --</option>';
   disponiveis.forEach(p => {
@@ -371,7 +386,8 @@ window.renderPortarias = function() {
     return true;
   });
   
-  filtered.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+  // Ordenando de forma decrescente matemática
+  filtered.sort(sortDescNum);
   
   // Atualiza as Badges respeitando o ano selecionado
   let ok = 0, warn = 0, exp = 0, total = 0;
@@ -589,8 +605,9 @@ window.renderRelatorios = function() {
         const activePorts = allLinkedPorts.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key !== 'expired');
         const inactivePorts = allLinkedPorts.filter(p => p.status === 'revogada' || getStatus(p.data_validade).key === 'expired');
 
-        activePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
-        inactivePorts.sort((a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || ''));
+        // Ordenando de forma decrescente matemática
+        activePorts.sort(sortDescNum);
+        inactivePorts.sort(sortDescNum);
 
         const activeHtml = activePorts.length > 0 
           ? activePorts.map(p => {
@@ -652,14 +669,11 @@ window.renderRelatorios = function() {
       return pYear === filterAnoRel;
     });
   }
-
-  // AQUI ESTAVA O ERRO! (Um parêntese extra no final)
-  const sortDescDate = (a, b) => (b.data_publicacao || '').localeCompare(a.data_publicacao || '');
   
-  const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescDate);
-  const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescDate);
-  const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescDate);
-  const revogadas = portariasFiltradas.filter(p => p.status === 'revogada').sort(sortDescDate); 
+  const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescNum);
+  const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescNum);
+  const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescNum);
+  const revogadas = portariasFiltradas.filter(p => p.status === 'revogada').sort(sortDescNum); 
 
   document.getElementById('stat-port-vigentes').textContent = vigentes.length; 
   document.getElementById('stat-port-vencer').textContent = aVencer.length; 
