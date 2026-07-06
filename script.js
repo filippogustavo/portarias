@@ -62,7 +62,7 @@ function resetInactivityTimer() {
 });
 
 // ==========================================
-// FUNÇÕES DE INTERFACE (Globais)
+// FUNÇÕES DE INTERFACE (GLOBAIS)
 // ==========================================
 window.closeModalLogin = () => { document.getElementById('modal-login').classList.add('hidden'); document.getElementById('modal-login').classList.remove('flex'); }
 window.closeModalPortaria = () => { document.getElementById('modal-portaria').classList.add('hidden'); document.getElementById('modal-portaria').classList.remove('flex'); editingPortaria = null; }
