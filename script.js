@@ -119,9 +119,33 @@ function getStatus(dateStr) {
 
 function formatPortariaNum(num) {
   if (!num) return '—';
-  let n = num.trim().toUpperCase().replace(/\\/g, '/');
+  let n = esc(num.trim().toUpperCase().replace(/\\/g, '/'));
   if (n.includes('DRG/PEP/IFSP')) return `Nº ${n}`;
   return `Nº ${n} - DRG/PEP/IFSP`;
+}
+
+// ==========================================
+// SEGURANÇA: ESCAPE DE HTML (ANTI-XSS)
+// ==========================================
+// Qualquer dado vindo do Firestore (nome, descrição, etc.) deve passar
+// por aqui antes de ser inserido via innerHTML, para impedir que texto
+// como "<img src=x onerror=...>" seja executado como HTML/JS.
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+// Valida que um link é http/https antes de usá-lo em href,
+// bloqueando esquemas perigosos como "javascript:".
+function safeUrl(url) {
+  if (!url) return '';
+  try {
+    const u = new URL(url, window.location.href);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return esc(url);
+  } catch (_) { /* URL inválida */ }
+  return '';
 }
 
 // ==========================================
@@ -161,8 +185,8 @@ function renderRevogaOptions(query = '') {
 
   let html = '<option value="">-- Nenhuma --</option>';
   disponiveis.forEach(p => {
-    const descCurta = p.descricao.length > 45 ? p.descricao.substring(0, 45) + '...' : p.descricao;
-    html += `<option value="${p.__backendId}">Nº ${p.numero} (${formatDate(p.data_publicacao)}) - ${descCurta}</option>`;
+    const descCurta = esc(p.descricao.length > 45 ? p.descricao.substring(0, 45) + '...' : p.descricao);
+    html += `<option value="${esc(p.__backendId)}">Nº ${esc(p.numero)} (${formatDate(p.data_publicacao)}) - ${descCurta}</option>`;
   });
 
   select.innerHTML = html;
@@ -249,12 +273,12 @@ function renderServidorBindingList(portaria) {
   if (servidores.length === 0) { list.innerHTML = '<p class="text-slate-500 text-xs">Nenhum servidor cadastrado</p>'; return; }
   const bindingMap = portaria ? JSON.parse(portaria.servidores || '{}') : {};
   list.innerHTML = servidores.map(srv => `
-    <div class="bind-row flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200" data-name="${srv.nome.toLowerCase()} ${srv.segmento.toLowerCase()} ${srv.setor.toLowerCase()}">
+    <div class="bind-row flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200" data-name="${esc(srv.nome.toLowerCase())} ${esc(srv.segmento.toLowerCase())} ${esc(srv.setor.toLowerCase())}">
       <div class="flex items-center gap-3 overflow-hidden">
-        <input type="checkbox" data-srv-id="${srv.__backendId}" ${bindingMap[srv.__backendId] ? 'checked' : ''} class="w-4 h-4 shrink-0 text-accent rounded border-slate-300">
-        <div class="flex flex-col min-w-0"><span class="text-sm font-bold text-slate-800 truncate">${srv.nome}</span><span class="text-xs text-slate-500 truncate">${srv.segmento} - ${srv.setor}</span></div>
+        <input type="checkbox" data-srv-id="${esc(srv.__backendId)}" ${bindingMap[srv.__backendId] ? 'checked' : ''} class="w-4 h-4 shrink-0 text-accent rounded border-slate-300">
+        <div class="flex flex-col min-w-0"><span class="text-sm font-bold text-slate-800 truncate">${esc(srv.nome)}</span><span class="text-xs text-slate-500 truncate">${esc(srv.segmento)} - ${esc(srv.setor)}</span></div>
       </div>
-      <input type="number" data-srv-hours="${srv.__backendId}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
+      <input type="number" data-srv-hours="${esc(srv.__backendId)}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
     </div>
   `).join('');
 }
@@ -335,6 +359,28 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 // ==========================================
 // IMPORTAÇÃO DE SERVIDORES (EM LOTE)
 // ==========================================
+// Parser simples de linha CSV com suporte a campos entre aspas
+// (permite vírgulas dentro do valor, ex: "Almeida, Filippo",Docente,TI)
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (inQuotes) {
+      if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (char === '"') { inQuotes = false; }
+      else { current += char; }
+    } else {
+      if (char === '"') inQuotes = true;
+      else if (char === ',') { result.push(current); current = ''; }
+      else current += char;
+    }
+  }
+  result.push(current);
+  return result.map(s => s.trim());
+}
+
 document.getElementById('btn-process-csv')?.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!isLoggedIn) return showToast('Acesso negado!', 'error');
@@ -342,16 +388,19 @@ document.getElementById('btn-process-csv')?.addEventListener('click', async (e) 
   if (!csvText) return showToast('O campo está vazio.', 'warn');
   const btn = e.currentTarget;
   btn.innerHTML = 'Importando...'; btn.disabled = true;
-  const lines = csvText.split('\n'); let successCount = 0;
+  const lines = csvText.split('\n').filter(l => l.trim() !== '');
+  let successCount = 0; let skippedCount = 0;
   for (let line of lines) {
-    const parts = line.split(',');
+    const parts = parseCsvLine(line);
     if (parts.length >= 3) {
-      const nome = parts[0].trim(); const segmento = parts[1].trim(); const setor = parts[2].trim();
-      if (nome) { try { await addDoc(collection(db, "servidores"), { nome, segmento, setor }); successCount++; } catch (e) {} }
-    }
+      const nome = parts[0]; const segmento = parts[1]; const setor = parts[2];
+      if (nome) { try { await addDoc(collection(db, "servidores"), { nome, segmento, setor }); successCount++; } catch (e) { skippedCount++; } }
+      else { skippedCount++; }
+    } else { skippedCount++; }
   }
   btn.innerHTML = 'Importar'; btn.disabled = false; window.closeModalImportCSV();
-  if (successCount > 0) showToast(`${successCount} servidores importados!`, 'success');
+  if (successCount > 0) showToast(`${successCount} servidores importados!${skippedCount ? ` (${skippedCount} linha(s) ignorada(s))` : ''}`, 'success');
+  else showToast('Nenhum servidor válido encontrado no CSV.', 'warn');
 });
 
 // ==========================================
@@ -414,21 +463,21 @@ window.renderPortarias = function() {
   list.innerHTML = filtered.map(p => {
     const isRevogada = p.status === 'revogada';
     const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
-    const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${p.tipo}</span>` : '';
-    const linkBtn = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
+    const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">${esc(p.tipo)}</span>` : '';
+    const linkBtn = p.link ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-sm font-bold transition-colors w-full md:w-auto justify-center"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Acessar Documento</a>` : '';
 
     const binding = JSON.parse(p.servidores || '{}');
     const srvList = Object.keys(binding).length > 0 
       ? Object.keys(binding).map(srvId => { 
           const srv = servidores.find(serv => serv.__backendId === srvId); 
-          return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? srv.nome : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${binding[srvId]}h)</strong></span>`; 
+          return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? esc(srv.nome) : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${esc(binding[srvId])}h)</strong></span>`; 
         }).join('')
       : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
     
     const adminBtns = (isLoggedIn && !isRevogada) ? `
       <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
-        <button onclick="editPortariaDirect('${p.__backendId}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
-        <button onclick="revokePortariaDirect('${p.__backendId}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="file-x" style="width:18px;height:18px;"></i></button>
+        <button onclick="editPortariaDirect('${esc(p.__backendId)}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
+        <button onclick="revokePortariaDirect('${esc(p.__backendId)}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="file-x" style="width:18px;height:18px;"></i></button>
       </div>
     ` : '';
 
@@ -442,7 +491,7 @@ window.renderPortarias = function() {
               ${tipoTag}
               <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
             </div>
-            <p class="text-slate-600 text-sm mb-5">${p.descricao}</p>
+            <p class="text-slate-600 text-sm mb-5">${esc(p.descricao)}</p>
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
               <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Servidores Vinculados na Portaria</p>
               <div class="flex flex-wrap gap-2">${srvList}</div>
@@ -476,16 +525,16 @@ window.renderServidores = function() {
   list.innerHTML = servidores.map(s => `
     <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group flex justify-between items-center transition-all hover:border-slate-300">
       <div class="flex flex-col gap-1 pr-4 min-w-0">
-        <p class="font-bold text-slate-800 text-lg truncate" title="${s.nome}">${s.nome}</p>
+        <p class="font-bold text-slate-800 text-lg truncate" title="${esc(s.nome)}">${esc(s.nome)}</p>
         <div class="flex flex-wrap gap-2 mt-2">
-          <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${s.segmento}</span>
-          <span class="bg-blue-50 text-accent px-2 py-1 rounded text-xs font-semibold">${s.setor}</span>
+          <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-semibold">${esc(s.segmento)}</span>
+          <span class="bg-blue-50 text-accent px-2 py-1 rounded text-xs font-semibold">${esc(s.setor)}</span>
         </div>
       </div>
       ${isLoggedIn ? `
         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
-          <button onclick="openModalServidor('${s.__backendId}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
-          <button onclick="deleteServidor('${s.__backendId}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
+          <button onclick="openModalServidor('${esc(s.__backendId)}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
+          <button onclick="deleteServidor('${esc(s.__backendId)}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
         </div>
       ` : ''}
     </div>
@@ -505,15 +554,15 @@ window.openDetailPortaria = function(id) {
   
   const binding = JSON.parse(p.servidores || '{}');
   const srvList = Object.keys(binding).length > 0 
-    ? Object.keys(binding).map(srvId => { const srv = servidores.find(s => s.__backendId === srvId); return `<span class="inline-block px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs mr-1 mb-1 border border-slate-200">${srv ? srv.nome : 'Removido'} (${binding[srvId]}h)</span>`; }).join('')
+    ? Object.keys(binding).map(srvId => { const srv = servidores.find(s => s.__backendId === srvId); return `<span class="inline-block px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs mr-1 mb-1 border border-slate-200">${srv ? esc(srv.nome) : 'Removido'} (${esc(binding[srvId])}h)</span>`; }).join('')
     : '<span class="text-slate-500 text-sm">Nenhum servidor</span>';
     
-  const tipoHtml = p.tipo ? `<p class="text-slate-500 text-xs font-bold uppercase mb-1">Tipo</p><p class="text-slate-800 font-medium">${p.tipo}</p>` : '';
-  const linkHtml = p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-accent hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors w-fit"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Ver documento oficial</a>` : '';
+  const tipoHtml = p.tipo ? `<p class="text-slate-500 text-xs font-bold uppercase mb-1">Tipo</p><p class="text-slate-800 font-medium">${esc(p.tipo)}</p>` : '';
+  const linkHtml = p.link ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-accent hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors w-fit"><i data-lucide="external-link" style="width:16px;height:16px;"></i> Ver documento oficial</a>` : '';
 
   document.getElementById('detail-body-portaria').innerHTML = `
     <div><span class="status-pill ${s.class}">${s.label}</span></div>
-    <p class="text-slate-800 font-medium mt-2 text-lg">${p.descricao}</p>
+    <p class="text-slate-800 font-medium mt-2 text-lg">${esc(p.descricao)}</p>
     ${linkHtml}
     <div class="grid grid-cols-2 gap-3 text-sm mt-5">
       <div class="bg-slate-50 p-3 rounded-lg"><p class="text-slate-500 text-[10px] uppercase font-bold">Publicação</p><p class="text-slate-800 font-medium">${formatDate(p.data_publicacao)}</p></div>
@@ -611,9 +660,9 @@ window.renderRelatorios = function() {
 
         const activeHtml = activePorts.length > 0 
           ? activePorts.map(p => {
-              const inner = `<strong class="text-slate-800">Nº ${p.numero} - DRG/PEP/IFSP</strong> - ${p.descricao}`;
+              const inner = `<strong class="text-slate-800">Nº ${esc(p.numero)} - DRG/PEP/IFSP</strong> - ${esc(p.descricao)}`;
               return p.link 
-                ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 hover:bg-blue-50 hover:text-blue-700 transition-colors px-2 rounded cursor-pointer">${inner}</a>`
+                ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="block text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 hover:bg-blue-50 hover:text-blue-700 transition-colors px-2 rounded cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 px-2 rounded">${inner}</div>`;
             }).join('')
           : '<div class="text-xs text-slate-400 py-2 italic px-2">Nenhuma portaria ativa</div>';
@@ -622,29 +671,29 @@ window.renderRelatorios = function() {
           ? `<p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mt-4 mb-1 px-2">Histórico: Revogadas / Vencidas</p>` + 
             inactivePorts.map(p => {
               const labelStatus = p.status === 'revogada' ? 'Revogada' : 'Vencida';
-              const inner = `<strong class="text-slate-700">Nº ${p.numero} - DRG/PEP/IFSP</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${p.descricao}</span>`;
+              const inner = `<strong class="text-slate-700">Nº ${esc(p.numero)} - DRG/PEP/IFSP</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${esc(p.descricao)}</span>`;
               return p.link
-                ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
+                ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 px-2 rounded bg-slate-50 opacity-80">${inner}</div>`;
             }).join('')
           : '';
 
         return `
-          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group" onclick="toggleServidorPorts('${s.__backendId}')">
+          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group" onclick="toggleServidorPorts('${esc(s.__backendId)}')">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <p class="font-bold text-slate-800 text-base truncate">${s.nome}</p>
-                  <i id="icon-srv-${s.__backendId}" data-lucide="chevron-down" style="width:16px;height:16px;" class="text-slate-400 transition-transform"></i>
+                  <p class="font-bold text-slate-800 text-base truncate">${esc(s.nome)}</p>
+                  <i id="icon-srv-${esc(s.__backendId)}" data-lucide="chevron-down" style="width:16px;height:16px;" class="text-slate-400 transition-transform"></i>
                 </div>
-                <p class="text-slate-500 text-xs mt-1 font-medium">${s.segmento} • ${s.setor}</p>
+                <p class="text-slate-500 text-xs mt-1 font-medium">${esc(s.segmento)} • ${esc(s.setor)}</p>
               </div>
               <div class="flex gap-3 shrink-0">
                 <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm"><i data-lucide="clock" style="width:16px;height:16px;"></i> ${srvHoras[s.__backendId] || 0}h</div>
                 <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
               </div>
             </div>
-            <div id="expand-srv-${s.__backendId}" class="hidden mt-4 pt-2 border-t border-slate-100 w-full" onclick="event.stopPropagation()">
+            <div id="expand-srv-${esc(s.__backendId)}" class="hidden mt-4 pt-2 border-t border-slate-100 w-full" onclick="event.stopPropagation()">
               <p class="text-[10px] font-bold text-slate-400 uppercase mb-1 px-2">Portarias Vigentes</p>
               ${activeHtml} ${inactiveHtml}
             </div>
@@ -689,30 +738,30 @@ window.renderRelatorios = function() {
       div.innerHTML = arr.map(p => {
         const isRevogada = p.status === 'revogada';
         const s = isRevogada ? { class: 'bg-slate-200 text-slate-600 border-slate-300', label: 'Revogada' } : getStatus(p.data_validade); 
-        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ml-1">${p.tipo}</span>` : '';
+        const tipoTag = p.tipo ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ml-1">${esc(p.tipo)}</span>` : '';
         
         const binding = JSON.parse(p.servidores || '{}');
         const srvList = Object.keys(binding).map(srvId => { 
           const srv = servidores.find(serv => serv.__backendId === srvId); 
-          return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? srv.nome : 'Removido'} (${binding[srvId]}h)</span>`; 
+          return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? esc(srv.nome) : 'Removido'} (${esc(binding[srvId])}h)</span>`; 
         }).join('') || '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
 
-        const linkBtn = p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Acessar Documento</a>` : '';
+        const linkBtn = p.link ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Acessar Documento</a>` : '';
 
         return `
-          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${p.__backendId}')">
+          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-300 transition-colors cursor-pointer group ${isRevogada ? 'opacity-70 grayscale' : ''}" onclick="togglePortariaDetails('${esc(p.__backendId)}')">
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
-                  <span class="font-bold text-slate-800 text-base truncate">Nº ${p.numero} - DRG/PEP/IFSP</span>
+                  <span class="font-bold text-slate-800 text-base truncate">Nº ${esc(p.numero)} - DRG/PEP/IFSP</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                 </div>
-                <p class="text-slate-600 text-sm mt-1 line-clamp-1">${p.descricao}</p>
+                <p class="text-slate-600 text-sm mt-1 line-clamp-1">${esc(p.descricao)}</p>
               </div>
-              <i id="icon-port-desk-${p.__backendId}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
+              <i id="icon-port-desk-${esc(p.__backendId)}" data-lucide="chevron-down" style="width:20px;height:20px;" class="text-slate-400 transition-transform hidden md:block shrink-0"></i>
             </div>
-            <div id="expand-port-${p.__backendId}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
+            <div id="expand-port-${esc(p.__backendId)}" class="hidden mt-4 pt-4 border-t border-slate-100 w-full cursor-default" onclick="event.stopPropagation()">
               <div class="flex flex-col md:flex-row justify-between gap-5">
                 <div class="flex-1"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Servidores Vinculados</p><div>${srvList}</div></div>
                 <div class="flex flex-col gap-3 md:items-end shrink-0">
@@ -795,13 +844,18 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentFilter = btn.dataset.filter;
     document.querySelectorAll('.filter-btn').forEach(b => {
-      b.className = b.dataset.filter === 'revogada' 
-        ? 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-red-600 hover:bg-red-50 whitespace-nowrap'
-        : 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap';
+      const isRevogadaBtn = b.dataset.filter === 'revogada';
+      b.classList.remove('bg-accent', 'bg-red-100', 'text-white', 'text-red-700', 'shadow-sm');
+      b.classList.add('bg-transparent', 'text-slate-500');
+      b.classList.toggle('hover:text-red-600', isRevogadaBtn);
+      b.classList.toggle('hover:bg-red-50', isRevogadaBtn);
+      b.classList.toggle('hover:text-slate-800', !isRevogadaBtn);
+      b.classList.toggle('hover:bg-slate-50', !isRevogadaBtn);
     });
-    btn.className = btn.dataset.filter === 'revogada'
-      ? 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-red-100 text-red-700 shadow-sm whitespace-nowrap'
-      : 'filter-btn px-5 py-2 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm whitespace-nowrap';
+    const isRevogada = btn.dataset.filter === 'revogada';
+    btn.classList.remove('bg-transparent', 'text-slate-500', 'hover:text-red-600', 'hover:bg-red-50', 'hover:text-slate-800', 'hover:bg-slate-50');
+    btn.classList.add('shadow-sm');
+    btn.classList.add(...(isRevogada ? ['bg-red-100', 'text-red-700'] : ['bg-accent', 'text-white']));
     renderPortarias();
   });
 });
@@ -824,6 +878,8 @@ function downloadCSV(filename, data) {
   document.body.removeChild(link); 
 }
 
+function csvField(v) { return `"${String(v ?? '').replace(/"/g, '""')}"`; }
+
 document.getElementById('btn-export-servidores').addEventListener('click', (e) => {
   e.preventDefault();
   if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
@@ -835,7 +891,7 @@ document.getElementById('btn-export-servidores').addEventListener('click', (e) =
     Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; });
   });
   const csv = ['"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias Ativas"'];
-  servidores.forEach(s => { csv.push(`"${s.nome}","${s.segmento}","${s.setor}",${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`); });
+  servidores.forEach(s => { csv.push(`${csvField(s.nome)},${csvField(s.segmento)},${csvField(s.setor)},${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`); });
   downloadCSV(`relatorio_servidores_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
 
@@ -845,7 +901,7 @@ document.getElementById('btn-export-portarias').addEventListener('click', (e) =>
   const csv = ['"Número","Descrição","Tipo","Link","Data Publicação","Data Validade","Status"'];
   portarias.forEach(p => {
     const s = p.status === 'revogada' ? 'Revogada' : getStatus(p.data_validade).label;
-    csv.push(`"${p.numero}","${(p.descricao||'').replace(/"/g,'""')}","${p.tipo}","${p.link}","${p.data_publicacao}","${p.data_validade}","${s}"`);
+    csv.push(`${csvField(p.numero)},${csvField(p.descricao)},${csvField(p.tipo)},${csvField(p.link)},${csvField(p.data_publicacao)},${csvField(p.data_validade)},${csvField(s)}`);
   });
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
