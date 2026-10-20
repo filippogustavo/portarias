@@ -98,3 +98,16 @@ select {
 
 /* Status Portaria Indeterminada */
 .status-permanent { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+
+/* Área de soltar PDFs (importação) */
+#pdf-drop.drag-over { border-color: #2563eb; background: #eff6ff; }
+
+/* Botões de admin: em telas de toque (sem hover) ficam sempre visíveis */
+@media (hover: none) {
+  .admin-actions { opacity: 1 !important; }
+}
+
+/* Celular: menu lateral aberto fica sobreposto ao conteúdo */
+@media (max-width: 767px) {
+  #sidebar.sidebar-expanded { position: absolute; top: 0; bottom: 0; left: 0; }
+}
