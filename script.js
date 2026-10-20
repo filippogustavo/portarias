@@ -3,7 +3,7 @@ import {
   initializeFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager, 
-  collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot 
+  collection, addDoc, doc, updateDoc, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
@@ -39,6 +39,8 @@ let viewingPortaria = null;
 let currentFilter = 'all';
 let searchQuery = '';
 let searchRelSrvQuery = '';
+let importItens = [];        // PDFs lidos na importação, aguardando revisão
+let itemImportando = null;   // item da importação aberto no formulário de portaria
 
 // ==========================================
 // 2. AUTO-LOGOUT (SEGURANÇA POR INATIVIDADE)
@@ -62,10 +64,14 @@ function resetInactivityTimer() {
 });
 
 // ==========================================
-// FUNÇÕES DE INTERFACE (GLOBAIS)
+// FUNÇÕES DE INTERFACE (Globais)
 // ==========================================
 window.closeModalLogin = () => { document.getElementById('modal-login').classList.add('hidden'); document.getElementById('modal-login').classList.remove('flex'); }
-window.closeModalPortaria = () => { document.getElementById('modal-portaria').classList.add('hidden'); document.getElementById('modal-portaria').classList.remove('flex'); editingPortaria = null; }
+window.closeModalPortaria = () => {
+  document.getElementById('modal-portaria').classList.add('hidden'); document.getElementById('modal-portaria').classList.remove('flex'); editingPortaria = null;
+  // Se a portaria veio da importação de PDF, volta para a lista de importação
+  if (itemImportando) { itemImportando = null; openModalImportPdf(); }
+}
 window.closeModalServidor = () => { document.getElementById('modal-servidor').classList.add('hidden'); document.getElementById('modal-servidor').classList.remove('flex'); editingServidor = null; }
 window.closeModalImportCSV = () => { document.getElementById('modal-import-csv').classList.add('hidden'); document.getElementById('modal-import-csv').classList.remove('flex'); }
 window.closeDetailPortaria = () => { document.getElementById('modal-detail-portaria').classList.add('hidden'); document.getElementById('modal-detail-portaria').classList.remove('flex'); viewingPortaria = null; }
@@ -80,12 +86,15 @@ function updateAdminUI() {
   if (isLoggedIn) {
     loginBtn.classList.add('hidden'); logoutBtn.classList.remove('hidden');
     document.getElementById('btn-new-portaria').classList.remove('hidden');
+    document.getElementById('btn-import-pdf').classList.remove('hidden');
     document.getElementById('btn-new-servidor').classList.remove('hidden');
     document.getElementById('btn-import-csv').classList.remove('hidden');
     if (menuServidores) { menuServidores.classList.remove('hidden'); menuServidores.classList.add('flex'); }
   } else {
     loginBtn.classList.remove('hidden'); logoutBtn.classList.add('hidden');
     document.getElementById('btn-new-portaria').classList.add('hidden');
+    document.getElementById('btn-import-pdf').classList.add('hidden');
+    window.closeModalImportPdf();
     document.getElementById('btn-new-servidor').classList.add('hidden');
     document.getElementById('btn-import-csv').classList.add('hidden');
     if (menuServidores) { menuServidores.classList.add('hidden'); menuServidores.classList.remove('flex'); }
@@ -96,7 +105,12 @@ function updateAdminUI() {
 function formatDate(d) { 
   if (!d) return 'Indeterminada'; 
   const [y, m, day] = d.split('-'); 
-  return `${day}/${m}/${y}`; 
+  return `${day}/${m}/${y}`;
+}
+
+// Horas podem ser fracionadas (ex: 1,5h). Arredonda para evitar ruído de ponto flutuante.
+function formatHoras(h) {
+  return Number((Number(h) || 0).toFixed(2)).toLocaleString('pt-BR');
 }
 
 function showToast(msg, type = 'success') {
@@ -185,7 +199,8 @@ function renderRevogaOptions(query = '') {
 
   let html = '<option value="">-- Nenhuma --</option>';
   disponiveis.forEach(p => {
-    const descCurta = esc(p.descricao.length > 45 ? p.descricao.substring(0, 45) + '...' : p.descricao);
+    const desc = p.descricao || '';
+    const descCurta = esc(desc.length > 45 ? desc.substring(0, 45) + '...' : desc);
     html += `<option value="${esc(p.__backendId)}">Nº ${esc(p.numero)} (${formatDate(p.data_publicacao)}) - ${descCurta}</option>`;
   });
 
@@ -195,6 +210,23 @@ function renderRevogaOptions(query = '') {
 document.getElementById('f-search-revoga')?.addEventListener('input', (e) => {
   renderRevogaOptions(e.target.value);
 });
+
+// ==========================================
+// FILTROS DE ANO (GERADOS A PARTIR DAS PORTARIAS)
+// ==========================================
+function renderAnoOptions() {
+  const anos = new Set([String(new Date().getFullYear())]);
+  portarias.forEach(p => { if (p.data_publicacao) anos.add(p.data_publicacao.split('-')[0]); });
+  const lista = [...anos].sort((a, b) => b - a);
+
+  ['filter-ano-portaria', 'filter-ano-rel-portaria'].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const atual = select.value;
+    select.innerHTML = '<option value="Todas">Todos os Anos</option>' + lista.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    select.value = lista.includes(atual) ? atual : 'Todas';
+  });
+}
 
 
 // ==========================================
@@ -210,12 +242,12 @@ onAuthStateChanged(auth, (user) => {
 
 onSnapshot(collection(db, "portarias"), (snapshot) => {
   portarias = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-  renderPortarias(); renderRelatorios();
+  renderAnoOptions(); renderPortarias(); renderRelatorios();
 }, (error) => console.error("Erro portarias:", error));
 
 onSnapshot(collection(db, "servidores"), (snapshot) => {
   servidores = snapshot.docs.map(doc => ({ __backendId: doc.id, ...doc.data() }));
-  servidores.sort((a,b) => a.nome.localeCompare(b.nome));
+  servidores.sort((a,b) => (a.nome || '').localeCompare(b.nome || ''));
   renderServidores(); renderPortarias(); renderRelatorios();
 }, (error) => console.error("Erro servidores:", error));
 
@@ -230,27 +262,30 @@ document.getElementById('btn-logout').addEventListener('click', async () => { aw
 // ==========================================
 // GESTÃO DE PORTARIAS E VÍNCULOS
 // ==========================================
-window.openModalPortaria = function(portaria = null) {
+// `prefill` preenche o formulário de uma portaria NOVA (usado pela importação de PDF)
+window.openModalPortaria = function(portaria = null, prefill = null) {
   if (!isLoggedIn) return showToast('Acesso negado. Faça login.', 'warn');
   editingPortaria = portaria;
-  document.getElementById('modal-title-portaria').textContent = portaria ? 'Editar Portaria' : 'Nova Portaria';
-  
+  document.getElementById('modal-title-portaria').textContent = portaria ? 'Editar Portaria' : prefill ? 'Revisar Portaria Importada' : 'Nova Portaria';
+
   const searchRevoga = document.getElementById('f-search-revoga');
   if (searchRevoga) searchRevoga.value = '';
   renderRevogaOptions();
 
-  if (portaria) {
-    document.getElementById('f-portaria-numero').value = portaria.numero || '';
-    document.getElementById('f-portaria-pub').value = portaria.data_publicacao || '';
-    document.getElementById('f-portaria-desc').value = portaria.descricao || '';
-    document.getElementById('f-portaria-validade').value = portaria.data_validade || '';
-    document.getElementById('f-portaria-tipo').value = portaria.tipo || '';
-    document.getElementById('f-portaria-link').value = portaria.link || '';
+  const dados = portaria || prefill;
+  if (dados) {
+    document.getElementById('f-portaria-numero').value = dados.numero || '';
+    document.getElementById('f-portaria-pub').value = dados.data_publicacao || '';
+    document.getElementById('f-portaria-desc').value = dados.descricao || '';
+    document.getElementById('f-portaria-validade').value = dados.data_validade || '';
+    document.getElementById('f-portaria-tipo').value = dados.tipo || '';
+    document.getElementById('f-portaria-link').value = dados.link || '';
   } else { document.getElementById('form-portaria').reset(); }
+  if (prefill?.revogaId) document.getElementById('f-portaria-revoga').value = prefill.revogaId;
 
   const searchVinculo = document.getElementById('f-search-vinculo');
   if(searchVinculo) searchVinculo.value = '';
-  renderServidorBindingList(portaria);
+  renderServidorBindingList(dados);
   
   document.getElementById('modal-portaria').classList.remove('hidden'); document.getElementById('modal-portaria').classList.add('flex');
 };
@@ -273,12 +308,12 @@ function renderServidorBindingList(portaria) {
   if (servidores.length === 0) { list.innerHTML = '<p class="text-slate-500 text-xs">Nenhum servidor cadastrado</p>'; return; }
   const bindingMap = portaria ? JSON.parse(portaria.servidores || '{}') : {};
   list.innerHTML = servidores.map(srv => `
-    <div class="bind-row flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200" data-name="${esc(srv.nome.toLowerCase())} ${esc(srv.segmento.toLowerCase())} ${esc(srv.setor.toLowerCase())}">
+    <div class="bind-row flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200" data-name="${esc(`${srv.nome || ''} ${srv.segmento || ''} ${srv.setor || ''}`.toLowerCase())}">
       <div class="flex items-center gap-3 overflow-hidden">
-        <input type="checkbox" data-srv-id="${esc(srv.__backendId)}" ${bindingMap[srv.__backendId] ? 'checked' : ''} class="w-4 h-4 shrink-0 text-accent rounded border-slate-300">
+        <input type="checkbox" data-srv-id="${esc(srv.__backendId)}" ${bindingMap[srv.__backendId] !== undefined ? 'checked' : ''} class="w-4 h-4 shrink-0 text-accent rounded border-slate-300">
         <div class="flex flex-col min-w-0"><span class="text-sm font-bold text-slate-800 truncate">${esc(srv.nome)}</span><span class="text-xs text-slate-500 truncate">${esc(srv.segmento)} - ${esc(srv.setor)}</span></div>
       </div>
-      <input type="number" data-srv-hours="${esc(srv.__backendId)}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
+      <input type="number" data-srv-hours="${esc(srv.__backendId)}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" step="0.5" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
     </div>
   `).join('');
 }
@@ -296,8 +331,8 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
   document.querySelectorAll('.bind-row input[type="checkbox"]').forEach(cb => {
     if (cb.checked) {
       const srvId = cb.dataset.srvId;
-      const hours = document.querySelector(`input[data-srv-hours="${srvId}"]`).value || 0;
-      servidorBinding[srvId] = parseInt(hours);
+      const hours = parseFloat(document.querySelector(`input[data-srv-hours="${srvId}"]`).value);
+      servidorBinding[srvId] = Number.isFinite(hours) && hours > 0 ? hours : 0;
     }
   });
 
@@ -314,10 +349,13 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
   const idRevogar = selectRevoga ? selectRevoga.value : null;
 
   try {
-    if (editingPortaria) { await updateDoc(doc(db, "portarias", editingPortaria.__backendId), data); showToast('Portaria atualizada!'); } 
-    else { await addDoc(collection(db, "portarias"), data); showToast('Portaria cadastrada!'); }
-    if (idRevogar) { await updateDoc(doc(db, "portarias", idRevogar), { status: 'revogada' }); showToast('Anterior revogada!', 'success'); }
-    window.closeModalPortaria(); 
+    let msg;
+    if (editingPortaria) { await updateDoc(doc(db, "portarias", editingPortaria.__backendId), data); msg = 'Portaria atualizada!'; }
+    else { await addDoc(collection(db, "portarias"), data); msg = 'Portaria cadastrada!'; }
+    if (idRevogar) { await updateDoc(doc(db, "portarias", idRevogar), { status: 'revogada' }); msg += ' Portaria anterior revogada.'; }
+    showToast(msg);
+    if (itemImportando) itemImportando.estado = 'salva';
+    window.closeModalPortaria();
   } catch (error) { showToast('Erro ao salvar no banco', 'error'); }
 });
 
@@ -339,10 +377,27 @@ window.openModalServidor = function(srvId = null) {
 
 window.openModalImportCSV = function() { if (!isLoggedIn) return; document.getElementById('csv-input').value = ''; document.getElementById('modal-import-csv').classList.remove('hidden'); document.getElementById('modal-import-csv').classList.add('flex'); };
 
+// Ao excluir, o servidor é desvinculado das portarias ativas (para não deixar
+// horas órfãs). Nas revogadas/vencidas o vínculo é mantido como histórico.
 window.deleteServidor = async function(id) {
   if (!isLoggedIn) return;
-  if(confirm("Excluir permanentemente este servidor?")) {
-    try { await deleteDoc(doc(db, "servidores", id)); showToast('Excluído com sucesso'); } catch(e) { showToast('Erro', 'error'); }
+  const ativasVinculadas = portarias.filter(p =>
+    p.status !== 'revogada' && getStatus(p.data_validade).key !== 'expired' &&
+    JSON.parse(p.servidores || '{}')[id] !== undefined
+  );
+  const aviso = ativasVinculadas.length ? `\n\nEle será desvinculado de ${ativasVinculadas.length} portaria(s) ativa(s).` : '';
+  if(confirm("Excluir permanentemente este servidor?" + aviso)) {
+    try {
+      const batch = writeBatch(db);
+      ativasVinculadas.forEach(p => {
+        const binding = JSON.parse(p.servidores || '{}');
+        delete binding[id];
+        batch.update(doc(db, "portarias", p.__backendId), { servidores: JSON.stringify(binding) });
+      });
+      batch.delete(doc(db, "servidores", id));
+      await batch.commit();
+      showToast('Excluído com sucesso');
+    } catch(e) { showToast('Erro', 'error'); }
   }
 }
 
@@ -360,8 +415,9 @@ document.getElementById('form-servidor').addEventListener('submit', async (e) =>
 // IMPORTAÇÃO DE SERVIDORES (EM LOTE)
 // ==========================================
 // Parser simples de linha CSV com suporte a campos entre aspas
-// (permite vírgulas dentro do valor, ex: "Almeida, Filippo",Docente,TI)
-function parseCsvLine(line) {
+// (permite vírgulas dentro do valor, ex: "Almeida, Filippo",Docente,TI).
+// Aceita vírgula ou ponto e vírgula (padrão do Excel em português).
+function parseCsvLine(line, sep = ',') {
   const result = [];
   let current = '';
   let inQuotes = false;
@@ -373,7 +429,7 @@ function parseCsvLine(line) {
       else { current += char; }
     } else {
       if (char === '"') inQuotes = true;
-      else if (char === ',') { result.push(current); current = ''; }
+      else if (char === sep) { result.push(current); current = ''; }
       else current += char;
     }
   }
@@ -389,9 +445,10 @@ document.getElementById('btn-process-csv')?.addEventListener('click', async (e) 
   const btn = e.currentTarget;
   btn.innerHTML = 'Importando...'; btn.disabled = true;
   const lines = csvText.split('\n').filter(l => l.trim() !== '');
+  const sep = lines[0].includes(';') ? ';' : ',';
   let successCount = 0; let skippedCount = 0;
   for (let line of lines) {
-    const parts = parseCsvLine(line);
+    const parts = parseCsvLine(line, sep);
     if (parts.length >= 3) {
       const nome = parts[0]; const segmento = parts[1]; const setor = parts[2];
       if (nome) { try { await addDoc(collection(db, "servidores"), { nome, segmento, setor }); successCount++; } catch (e) { skippedCount++; } }
@@ -402,6 +459,319 @@ document.getElementById('btn-process-csv')?.addEventListener('click', async (e) 
   if (successCount > 0) showToast(`${successCount} servidores importados!${skippedCount ? ` (${skippedCount} linha(s) ignorada(s))` : ''}`, 'success');
   else showToast('Nenhum servidor válido encontrado no CSV.', 'warn');
 });
+
+// ==========================================
+// IMPORTAÇÃO DE PORTARIAS (PDF DO SUAP)
+// ==========================================
+// O texto do PDF é lido no navegador (pdf.js) e os campos são extraídos
+// por padrões do modelo do SUAP. Nada é salvo sem confirmação do admin.
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+const MESES = { janeiro: 1, fevereiro: 2, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12 };
+let importSeq = 0;
+let salvandoImportacao = false;
+
+function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function normalizarNome(s) { return semAcento(s).toLowerCase().replace(/[^a-z]+/g, ' ').trim(); }
+
+function dataIso(ano, mes, dia) {
+  const m = parseInt(mes), d = parseInt(dia);
+  if (!m || !d || m > 12 || d > 31) return '';
+  return `${ano}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function dataPorExtenso(dia, mesNome, ano) {
+  return dataIso(ano, MESES[semAcento(mesNome).toLowerCase()], dia);
+}
+
+// "100/2026", "Nº 100/2026 - DRG/PEP/IFSP" e "100-2026" viram a mesma chave
+function chaveNumero(numero) {
+  const m = String(numero || '').match(/(\d+)\s*[\/\-]\s*(\d{4})/);
+  return m ? `${parseInt(m[1])}/${m[2]}` : '';
+}
+
+function encontrarPortariaPorNumero(chave) {
+  return chave ? portarias.find(p => chaveNumero(p.numero) === chave) : null;
+}
+
+// O site do campus publica o mesmo arquivo do SUAP trocando "Nº" por "N", espaços por "_"
+// e removendo os caracteres acentuados (ex: "MARÇO" vira "MARO")
+function linkPublicacao(nomeArquivo, ano) {
+  const nome = nomeArquivo.replace(/\s*\(\d+\)(?=\.pdf$)/i, '').replace(/N\s*[º°]/g, 'N').replace(/\s+/g, '_').replace(/[^\x00-\x7F]/g, '');
+  return `https://pep.ifsp.edu.br/images/PDF/Portarias/${ano}/${nome}`;
+}
+
+async function extrairTextoPdf(file) {
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let texto = '';
+  for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+    const content = await (await pdf.getPage(i)).getTextContent();
+    texto += content.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('') + '\n';
+  }
+  return texto;
+}
+
+function extrairValidade(texto, dataPub) {
+  const t = semAcento(texto).toLowerCase().replace(/\s+/g, ' ');
+  const trechos = [...t.matchAll(/(?:vigencia|vigorara|vigorar|validade|prazo de)[^.]{0,200}/g)].map(m => m[0]);
+  for (const s of trechos) {
+    let m = s.match(/ano (?:letivo )?de (\d{4})/);
+    if (m) return `${m[1]}-12-31`;
+    m = s.match(/ate (?:o dia )?(\d{1,2})\s*(?:º|o)?\s+de\s+([a-z]+)\s+de\s+(\d{4})/);
+    if (m && MESES[m[2]]) return dataIso(m[3], MESES[m[2]], m[1]);
+    m = s.match(/ate (\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return dataIso(m[3], m[2], m[1]);
+    m = s.match(/(\d+)\s*(?:\([^)]*\))?\s*(dias|meses|mes|anos|ano)\b/);
+    if (m && dataPub) {
+      const [y, mo, d] = dataPub.split('-').map(Number);
+      const n = parseInt(m[1]);
+      const dt = m[2] === 'dias' ? new Date(y, mo - 1, d + n)
+               : m[2].startsWith('mes') ? new Date(y, mo - 1 + n, d)
+               : new Date(y + n, mo - 1, d);
+      return dataIso(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    }
+  }
+  return '';
+}
+
+function analisarPortaria(texto, nomeArquivo) {
+  const plano = texto.replace(/\s+/g, ' ');
+
+  // Cabeçalho: o primeiro "XXX Nº" do documento precisa ser PORTARIA (ignora editais etc.)
+  const mTitulo = plano.slice(0, 1000).match(/\b(PORTARIA|EDITAL|RESOLU[ÇC][ÃA]O|INSTRU[ÇC][ÃA]O NORMATIVA)\s+N\s*[º°o.]*\s*(\d+)\s*[\/\-]\s*(\d{4})/i);
+  if (!mTitulo || !/^portaria$/i.test(mTitulo[1])) {
+    return { estado: 'ignorada', avisos: ['Não parece ser uma portaria (cabeçalho "PORTARIA Nº" não encontrado).'] };
+  }
+  const ano = mTitulo[3];
+  const numero = `${parseInt(mTitulo[2])}/${ano}`;
+
+  // Publicação: carimbo "Publicado no sítio institucional em ..." ou data do cabeçalho
+  let data_publicacao = '';
+  let m = plano.match(/Publicad[oa] no s[íi]tio institucional em (\d{1,2})\s*º?\s+de\s+([A-Za-zÀ-ÿ]+)\s+de\s+(\d{4})/i)
+       || plano.slice(mTitulo.index, mTitulo.index + 160).match(/\bDE\s+(\d{1,2})\s*º?\s+DE\s+([A-Za-zÀ-ÿ]+)\s+DE\s+(\d{4})/i);
+  if (m) data_publicacao = dataPorExtenso(m[1], m[2], m[3]);
+
+  // Descrição: texto do Art. 1º (após o RESOLVE)
+  const idxResolve = plano.search(/RESOLVE/i);
+  const corpo = idxResolve >= 0 ? plano.slice(idxResolve + 7) : plano;
+  const mArt1 = corpo.match(/Art\.?\s*1(?!\d)\s*[º°o]?\.?\s*[-–—]?\s*([\s\S]*?)(?=\s*Art\.?\s*2(?!\d)|\s*D[êe] ci[êe]ncia|\s*Publique-se|$)/i);
+  let descricao = (mArt1 ? mArt1[1] : corpo.slice(0, 400))
+    .replace(/,?\s*SIAPE\s*(?:n\s*[º°]\s*)?:?\s*[\d*.\-xX]+/gi, '')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/^([A-ZÀ-Ý]{2,})\b/, w => w[0] + w.slice(1).toLowerCase());
+
+  // Revogação de portaria anterior
+  let revoga = null;
+  const mRev = plano.match(/revoga\S*\s+(?:a|as|o)?\s*(portarias?\s+n\s*[º°o.]*\s*(\d+)\s*\/\s*(\d{4})(?:\s*-\s*DRG[\-\/]PEP[\-\/]IFSP)?(?:,?\s+de\s+\d{1,2}\s*º?\s+de\s+[A-Za-zÀ-ÿ]+\s+de\s+\d{4})?)/i);
+  if (mRev) {
+    revoga = `${parseInt(mRev[2])}/${mRev[3]}`;
+    if (!/^revog/i.test(descricao)) descricao = `Revogar a ${mRev[1].toUpperCase()} e ${descricao}`;
+  }
+
+  const descNorm = semAcento(descricao).toLowerCase();
+  // Mesmo critério usado no cadastro manual: designações de membros/servidores contam como Comissão
+  const tipo = /fiscal/.test(descNorm) ? 'Fiscalização' : /\bdesign/.test(descNorm) ? 'Comissão' : 'Diversas';
+
+  // Servidores do cadastro cujo nome completo aparece no corpo (horas não constam no PDF).
+  // O bloco de assinatura é removido para não vincular o diretor que assina.
+  const corpoSemAssinatura = corpo
+    .replace(/Publique-se[\s\S]*?Publicad[oa] no s[íi]tio institucional em \d{1,2}\s*º?\s+de\s+\S+\s+de\s+\d{4}/i, ' ')
+    .replace(/assinado eletronicamente por:[\s\S]*?\d{2}:\d{2}:\d{2}/gi, ' ');
+  const textoNorm = ' ' + normalizarNome(corpoSemAssinatura) + ' ';
+  const servidoresMap = {};
+  servidores.forEach(s => {
+    const n = normalizarNome(s.nome);
+    if (n.length > 5 && textoNorm.includes(' ' + n + ' ')) servidoresMap[s.__backendId] = 0;
+  });
+
+  const dados = {
+    numero, data_publicacao, tipo, descricao, revoga,
+    data_validade: extrairValidade(corpo, data_publicacao),
+    link: linkPublicacao(nomeArquivo, ano),
+    servidores: servidoresMap
+  };
+
+  const avisos = [];
+  if (!data_publicacao) avisos.push('Data de publicação não encontrada.');
+  if (!dados.data_validade) avisos.push('Validade não identificada: ficará como Indeterminada.');
+  if (Object.keys(servidoresMap).length === 0) avisos.push('Nenhum servidor do cadastro foi encontrado no texto.');
+
+  let estado = (numero && data_publicacao && descricao) ? 'pronta' : 'incompleta';
+  if (encontrarPortariaPorNumero(numero)) { estado = 'duplicada'; avisos.unshift('Esta portaria já está cadastrada no sistema.'); }
+  else if (importItens.some(i => i.dados && i.estado !== 'duplicada' && chaveNumero(i.dados.numero) === numero)) { estado = 'duplicada'; avisos.unshift('Arquivo repetido nesta importação.'); }
+
+  return { estado, dados, avisos };
+}
+
+// Id da portaria a revogar: cadastrada e ativa, ou criada neste mesmo lote
+function resolverRevoga(revoga, criadasNoLote = {}) {
+  if (!revoga) return null;
+  const alvo = encontrarPortariaPorNumero(revoga);
+  if (alvo) return alvo.status === 'revogada' ? null : alvo.__backendId;
+  return criadasNoLote[revoga] || null;
+}
+
+function montarDocPortaria(d) {
+  return {
+    numero: d.numero, descricao: d.descricao, data_publicacao: d.data_publicacao,
+    data_validade: d.data_validade, tipo: d.tipo, link: d.link,
+    servidores: JSON.stringify(d.servidores), status: 'ativo'
+  };
+}
+
+async function processarPdfs(files) {
+  if (!window.pdfjsLib) return showToast('O leitor de PDF não carregou. Verifique a conexão.', 'error');
+  const pdfs = [...files].filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+  if (pdfs.length === 0) return showToast('Selecione arquivos PDF.', 'warn');
+
+  const novos = pdfs.map(f => ({ id: ++importSeq, arquivo: f.name, file: f, estado: 'lendo', avisos: [], selecionado: true }));
+  importItens.push(...novos);
+  renderImportList();
+
+  for (const item of novos) {
+    try { Object.assign(item, analisarPortaria(await extrairTextoPdf(item.file), item.arquivo)); }
+    catch (e) { console.error(e); item.estado = 'erro'; item.avisos = ['Não foi possível ler o PDF.']; }
+    delete item.file;
+    renderImportList();
+  }
+}
+
+const ESTADOS_IMPORT = {
+  lendo:      ['Lendo...', 'bg-slate-100 text-slate-500 border border-slate-200'],
+  pronta:     ['Pronta', 'status-ok'],
+  incompleta: ['Revisar', 'status-warn'],
+  duplicada:  ['Já cadastrada', 'bg-slate-100 text-slate-500 border border-slate-200'],
+  ignorada:   ['Não é portaria', 'bg-slate-100 text-slate-500 border border-slate-200'],
+  erro:       ['Erro', 'status-expired'],
+  salva:      ['Salva', 'status-permanent']
+};
+
+function renderImportList() {
+  const list = document.getElementById('pdf-import-list');
+  const acoes = document.getElementById('pdf-import-actions');
+  if (!list) return;
+  if (importItens.length === 0) { list.innerHTML = ''; acoes.classList.add('hidden'); acoes.classList.remove('flex'); return; }
+  acoes.classList.remove('hidden'); acoes.classList.add('flex');
+
+  const qtdSelecionadas = importItens.filter(i => i.estado === 'pronta' && i.selecionado).length;
+  const btnSalvar = document.getElementById('btn-salvar-importadas');
+  btnSalvar.textContent = salvandoImportacao ? 'Salvando...' : `Salvar selecionadas (${qtdSelecionadas})`;
+  btnSalvar.disabled = salvandoImportacao || qtdSelecionadas === 0;
+
+  list.innerHTML = importItens.map(item => {
+    const [rotulo, classe] = ESTADOS_IMPORT[item.estado];
+    const d = item.dados;
+    const podeRevisar = d && (item.estado === 'pronta' || item.estado === 'incompleta');
+    const checkbox = item.estado === 'pronta'
+      ? `<input type="checkbox" ${item.selecionado ? 'checked' : ''} onchange="toggleImportada(${item.id}, this.checked)" title="Incluir em Salvar selecionadas" class="w-4 h-4 p-0 mt-1 shrink-0 cursor-pointer">`
+      : '<span class="w-4 shrink-0"></span>';
+
+    let detalhes = '';
+    if (d) {
+      const chips = [
+        `Publicação: ${d.data_publicacao ? formatDate(d.data_publicacao) : '—'}`,
+        `Validade: ${formatDate(d.data_validade)}`,
+        `${Object.keys(d.servidores).length} servidor(es) identificado(s)`
+      ].map(c => `<span class="bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">${esc(c)}</span>`);
+
+      if (d.revoga) {
+        const alvo = encontrarPortariaPorNumero(d.revoga);
+        const noLote = importItens.some(o => o !== item && o.dados && chaveNumero(o.dados.numero) === d.revoga);
+        const [situacao, cor] = alvo ? (alvo.status === 'revogada' ? ['já revogada', 'slate'] : ['será revogada', 'red'])
+                              : noLote ? ['neste lote', 'red'] : ['não cadastrada', 'amber'];
+        chips.push(`<span class="bg-${cor}-50 text-${cor}-700 border border-${cor}-200 px-2 py-0.5 rounded">Revoga Nº ${esc(d.revoga)} (${situacao})</span>`);
+      }
+      detalhes = `
+        <p class="text-sm text-slate-600 line-clamp-2 mt-2">${esc(d.descricao)}</p>
+        <div class="flex flex-wrap gap-2 mt-2 text-xs font-semibold text-slate-600">${chips.join('')}</div>`;
+    }
+    const avisos = item.avisos.map(a => `<p class="text-[11px] text-amber-600 mt-1">• ${esc(a)}</p>`).join('');
+
+    return `
+      <div class="border border-slate-200 rounded-xl p-4 bg-white ${item.estado === 'salva' || item.estado === 'ignorada' || item.estado === 'duplicada' ? 'opacity-70' : ''}">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-start gap-3 min-w-0">
+            ${checkbox}
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-slate-800">${d ? formatPortariaNum(d.numero) : esc(item.arquivo)}</span>
+                ${d ? `<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">${esc(d.tipo)}</span>` : ''}
+                <span class="status-pill ${classe} scale-90 origin-left m-0">${rotulo}</span>
+              </div>
+              ${d ? `<p class="text-[11px] text-slate-400 truncate mt-0.5">${esc(item.arquivo)}</p>` : ''}
+            </div>
+          </div>
+          ${podeRevisar ? `<button type="button" onclick="revisarImportada(${item.id})" class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 transition-colors flex items-center gap-1.5"><i data-lucide="pencil" style="width:14px;height:14px;"></i>Revisar</button>` : ''}
+        </div>
+        ${detalhes}
+        ${avisos}
+      </div>`;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+function openModalImportPdf() {
+  if (!isLoggedIn) return;
+  renderImportList();
+  document.getElementById('modal-import-pdf').classList.remove('hidden'); document.getElementById('modal-import-pdf').classList.add('flex');
+}
+window.closeModalImportPdf = () => { document.getElementById('modal-import-pdf').classList.add('hidden'); document.getElementById('modal-import-pdf').classList.remove('flex'); };
+
+window.toggleImportada = function(id, marcado) {
+  const item = importItens.find(i => i.id === id);
+  if (item) item.selecionado = marcado;
+  renderImportList();
+};
+
+// Abre o formulário de portaria já preenchido; ao salvar ou cancelar, volta para a lista
+window.revisarImportada = function(id) {
+  const item = importItens.find(i => i.id === id);
+  if (!item || !item.dados) return;
+  window.closeModalImportPdf();
+  itemImportando = item;
+  window.openModalPortaria(null, { ...montarDocPortaria(item.dados), revogaId: resolverRevoga(item.dados.revoga) });
+};
+
+document.getElementById('btn-salvar-importadas').addEventListener('click', async () => {
+  if (!isLoggedIn || salvandoImportacao) return;
+  // Ordem crescente de número, para que revogações dentro do mesmo lote encontrem a portaria revogada
+  const itens = importItens.filter(i => i.estado === 'pronta' && i.selecionado).sort((a, b) => sortDescNum(b.dados, a.dados));
+  if (itens.length === 0) return;
+  if (!confirm(`Salvar ${itens.length} portaria(s) importada(s)? As horas dos servidores ficarão como 0h.`)) return;
+
+  salvandoImportacao = true; renderImportList();
+  const criadasNoLote = {};
+  let ok = 0, falhas = 0;
+  for (const item of itens) {
+    try {
+      const ref = await addDoc(collection(db, "portarias"), montarDocPortaria(item.dados));
+      criadasNoLote[item.dados.numero] = ref.id;
+      const idRevogar = resolverRevoga(item.dados.revoga, criadasNoLote);
+      if (idRevogar) await updateDoc(doc(db, "portarias", idRevogar), { status: 'revogada' });
+      item.estado = 'salva'; ok++;
+    } catch (e) {
+      console.error(e); item.estado = 'erro'; item.avisos = ['Falha ao salvar no banco.', ...item.avisos]; falhas++;
+    }
+    renderImportList();
+  }
+  salvandoImportacao = false; renderImportList();
+  showToast(falhas ? `${ok} salva(s), ${falhas} com erro.` : `${ok} portaria(s) cadastrada(s)!`, falhas ? 'warn' : 'success');
+});
+
+document.getElementById('btn-limpar-importadas').addEventListener('click', () => {
+  if (salvandoImportacao) return;
+  importItens = importItens.filter(i => i.estado === 'lendo');
+  renderImportList();
+});
+
+document.getElementById('pdf-input').addEventListener('change', (e) => { processarPdfs(e.target.files); e.target.value = ''; });
+
+const pdfDrop = document.getElementById('pdf-drop');
+['dragenter', 'dragover'].forEach(ev => pdfDrop.addEventListener(ev, (e) => { e.preventDefault(); pdfDrop.classList.add('drag-over'); }));
+['dragleave', 'drop'].forEach(ev => pdfDrop.addEventListener(ev, (e) => { e.preventDefault(); pdfDrop.classList.remove('drag-over'); }));
+pdfDrop.addEventListener('drop', (e) => processarPdfs(e.dataTransfer.files));
 
 // ==========================================
 // ABA PRINCIPAL (PORTARIAS ANALÍTICAS EXPANDIDAS)
@@ -457,7 +827,16 @@ window.renderPortarias = function() {
   document.getElementById('stat-warn').textContent = warn; 
   document.getElementById('stat-expired').textContent = exp;
 
-  if (filtered.length === 0) { list.innerHTML = ''; document.getElementById('empty-state').classList.remove('hidden'); return; }
+  if (filtered.length === 0) {
+    list.innerHTML = '';
+    const semCadastro = portarias.length === 0;
+    document.getElementById('empty-title').textContent = semCadastro ? 'Nenhuma portaria cadastrada' : 'Nenhuma portaria encontrada';
+    document.getElementById('empty-subtitle').textContent = semCadastro
+      ? (isLoggedIn ? 'Clique em "Nova Portaria" para começar' : '')
+      : 'Ajuste a busca ou os filtros selecionados';
+    document.getElementById('empty-state').classList.remove('hidden');
+    return;
+  }
   document.getElementById('empty-state').classList.add('hidden');
 
   list.innerHTML = filtered.map(p => {
@@ -470,12 +849,12 @@ window.renderPortarias = function() {
     const srvList = Object.keys(binding).length > 0 
       ? Object.keys(binding).map(srvId => { 
           const srv = servidores.find(serv => serv.__backendId === srvId); 
-          return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? esc(srv.nome) : 'Removido'} <strong class="text-slate-400 ml-1 font-bold">(${esc(binding[srvId])}h)</strong></span>`; 
+          return `<span class="inline-block px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 shadow-sm">${srv ? esc(srv.nome) : 'Servidor excluído'} <strong class="text-slate-400 ml-1 font-bold">(${formatHoras(binding[srvId])}h)</strong></span>`; 
         }).join('')
       : '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
     
     const adminBtns = (isLoggedIn && !isRevogada) ? `
-      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
+      <div class="admin-actions flex gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl absolute bottom-6 right-6">
         <button onclick="editPortariaDirect('${esc(p.__backendId)}')" title="Editar Portaria" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
         <button onclick="revokePortariaDirect('${esc(p.__backendId)}')" title="Revogar Portaria" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="file-x" style="width:18px;height:18px;"></i></button>
       </div>
@@ -532,7 +911,7 @@ window.renderServidores = function() {
         </div>
       </div>
       ${isLoggedIn ? `
-        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
+        <div class="admin-actions flex gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
           <button onclick="openModalServidor('${esc(s.__backendId)}')" title="Editar Servidor" class="p-2 text-slate-400 hover:text-accent hover:bg-blue-50 rounded-lg transition-colors"><i data-lucide="pencil" style="width:18px;height:18px;"></i></button>
           <button onclick="deleteServidor('${esc(s.__backendId)}')" title="Excluir Servidor" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>
         </div>
@@ -554,7 +933,7 @@ window.openDetailPortaria = function(id) {
   
   const binding = JSON.parse(p.servidores || '{}');
   const srvList = Object.keys(binding).length > 0 
-    ? Object.keys(binding).map(srvId => { const srv = servidores.find(s => s.__backendId === srvId); return `<span class="inline-block px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs mr-1 mb-1 border border-slate-200">${srv ? esc(srv.nome) : 'Removido'} (${esc(binding[srvId])}h)</span>`; }).join('')
+    ? Object.keys(binding).map(srvId => { const srv = servidores.find(s => s.__backendId === srvId); return `<span class="inline-block px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs mr-1 mb-1 border border-slate-200">${srv ? esc(srv.nome) : 'Servidor excluído'} (${formatHoras(binding[srvId])}h)</span>`; }).join('')
     : '<span class="text-slate-500 text-sm">Nenhum servidor</span>';
     
   const tipoHtml = p.tipo ? `<p class="text-slate-500 text-xs font-bold uppercase mb-1">Tipo</p><p class="text-slate-800 font-medium">${esc(p.tipo)}</p>` : '';
@@ -579,10 +958,8 @@ window.openDetailPortaria = function(id) {
 document.getElementById('btn-edit-portaria').addEventListener('click', () => { 
   if (viewingPortaria) { const temp = viewingPortaria; window.closeDetailPortaria(); window.openModalPortaria(temp); } 
 });
-document.getElementById('btn-revoke-portaria').addEventListener('click', async () => {
-  if (!viewingPortaria || !isLoggedIn) return;
-  try { await updateDoc(doc(db, "portarias", viewingPortaria.__backendId), { status: 'revogada' }); window.closeDetailPortaria(); showToast('Portaria revogada!'); } 
-  catch (error) { showToast('Erro', 'error'); }
+document.getElementById('btn-revoke-portaria').addEventListener('click', () => {
+  if (viewingPortaria) window.revokePortariaDirect(viewingPortaria.__backendId);
 });
 
 // ==========================================
@@ -607,25 +984,44 @@ window.togglePortariaDetails = function(id) {
   }
 }
 
-window.renderRelatorios = function() {
-  // RELATÓRIO DE SERVIDORES
-  const srvHoras = {}; const srvPortarias = {}; let totalHoras = 0;
+// Horas e quantidade de portarias ativas por servidor
+// (ignora vencidas, revogadas e vínculos de servidores excluídos)
+function calcularCargaServidores() {
+  const srvHoras = {}; const srvPortarias = {};
   servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
-  
   portarias.forEach(p => {
-    // IGNORA APENAS AS VENCIDAS E REVOGADAS
-    if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return; 
-    
+    if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return;
     const binding = JSON.parse(p.servidores || '{}');
-    Object.keys(binding).forEach(srvId => { 
-      srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; 
-      srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; 
-      totalHoras += binding[srvId]; 
+    Object.keys(binding).forEach(srvId => {
+      if (!(srvId in srvHoras)) return;
+      srvHoras[srvId] += Number(binding[srvId]) || 0;
+      srvPortarias[srvId]++;
     });
   });
-  
-  document.getElementById('stat-srv-total').textContent = servidores.length; 
-  document.getElementById('stat-srv-horas').textContent = totalHoras;
+  return { srvHoras, srvPortarias };
+}
+
+// Portarias filtradas pelos selects de tipo e ano do relatório
+function filtrarPortariasRelatorio() {
+  const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
+  const filterAnoRel = document.getElementById('filter-ano-rel-portaria')?.value || 'Todas';
+  return portarias.filter(p => {
+    if (filterTipo !== 'Todas' && p.tipo !== filterTipo) return false;
+    if (filterAnoRel !== 'Todas') {
+      const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
+      if (pYear !== filterAnoRel) return false;
+    }
+    return true;
+  });
+}
+
+window.renderRelatorios = function() {
+  // RELATÓRIO DE SERVIDORES
+  const { srvHoras, srvPortarias } = calcularCargaServidores();
+  const totalHoras = Object.values(srvHoras).reduce((a, b) => a + b, 0);
+
+  document.getElementById('stat-srv-total').textContent = servidores.length;
+  document.getElementById('stat-srv-horas').textContent = formatHoras(totalHoras);
 
   const srvDiv = document.getElementById('relatorio-servidores'); 
   const srvEmpty = document.getElementById('relatorio-servidores-empty');
@@ -634,7 +1030,7 @@ window.renderRelatorios = function() {
     let srvFiltrados = [...servidores]; 
     if (searchRelSrvQuery) {
       const q = searchRelSrvQuery.toLowerCase();
-      srvFiltrados = srvFiltrados.filter(s => s.nome.toLowerCase().includes(q));
+      srvFiltrados = srvFiltrados.filter(s => (s.nome || '').toLowerCase().includes(q));
     }
 
     srvFiltrados.sort((a, b) => (srvHoras[b.__backendId] || 0) - (srvHoras[a.__backendId] || 0));
@@ -660,7 +1056,7 @@ window.renderRelatorios = function() {
 
         const activeHtml = activePorts.length > 0 
           ? activePorts.map(p => {
-              const inner = `<strong class="text-slate-800">Nº ${esc(p.numero)} - DRG/PEP/IFSP</strong> - ${esc(p.descricao)}`;
+              const inner = `<strong class="text-slate-800">${formatPortariaNum(p.numero)}</strong> - ${esc(p.descricao)}`;
               return p.link 
                 ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="block text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 hover:bg-blue-50 hover:text-blue-700 transition-colors px-2 rounded cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-600 py-2 border-b border-slate-100 last:border-0 px-2 rounded">${inner}</div>`;
@@ -671,7 +1067,7 @@ window.renderRelatorios = function() {
           ? `<p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mt-4 mb-1 px-2">Histórico: Revogadas / Vencidas</p>` + 
             inactivePorts.map(p => {
               const labelStatus = p.status === 'revogada' ? 'Revogada' : 'Vencida';
-              const inner = `<strong class="text-slate-700">Nº ${esc(p.numero)} - DRG/PEP/IFSP</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${esc(p.descricao)}</span>`;
+              const inner = `<strong class="text-slate-700">${formatPortariaNum(p.numero)}</strong> <span class="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[9px] font-bold ml-1 uppercase">${labelStatus}</span><br/><span class="line-clamp-1 mt-0.5">${esc(p.descricao)}</span>`;
               return p.link
                 ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="block text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 hover:bg-red-50 hover:text-red-700 transition-colors px-2 rounded bg-slate-50 opacity-90 cursor-pointer">${inner}</a>`
                 : `<div class="text-xs text-slate-500 py-2 border-b border-slate-100 last:border-0 px-2 rounded bg-slate-50 opacity-80">${inner}</div>`;
@@ -689,7 +1085,7 @@ window.renderRelatorios = function() {
                 <p class="text-slate-500 text-xs mt-1 font-medium">${esc(s.segmento)} • ${esc(s.setor)}</p>
               </div>
               <div class="flex gap-3 shrink-0">
-                <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm"><i data-lucide="clock" style="width:16px;height:16px;"></i> ${srvHoras[s.__backendId] || 0}h</div>
+                <div class="flex items-center gap-1.5 text-slate-700 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 font-bold text-sm"><i data-lucide="clock" style="width:16px;height:16px;"></i> ${formatHoras(srvHoras[s.__backendId])}h</div>
                 <div class="flex items-center gap-1.5 text-slate-700 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold text-sm"><i data-lucide="file-text" style="width:16px;height:16px;"></i> ${srvPortarias[s.__backendId] || 0} port.</div>
               </div>
             </div>
@@ -703,22 +1099,8 @@ window.renderRelatorios = function() {
   }
 
   // RELATÓRIO DE PORTARIAS
-  const filterTipo = document.getElementById('filter-tipo-rel-portaria')?.value || 'Todas';
-  const filterAnoRel = document.getElementById('filter-ano-rel-portaria')?.value || 'Todas'; // NOVO: Filtro Ano
+  const portariasFiltradas = filtrarPortariasRelatorio();
 
-  let portariasFiltradas = portarias;
-  
-  if (filterTipo !== 'Todas') { 
-    portariasFiltradas = portariasFiltradas.filter(p => p.tipo === filterTipo); 
-  }
-  
-  if (filterAnoRel !== 'Todas') {
-    portariasFiltradas = portariasFiltradas.filter(p => {
-      const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
-      return pYear === filterAnoRel;
-    });
-  }
-  
   const vigentes = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'ok').sort(sortDescNum);
   const aVencer = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'warn').sort(sortDescNum);
   const vencidas = portariasFiltradas.filter(p => p.status !== 'revogada' && getStatus(p.data_validade).key === 'expired').sort(sortDescNum);
@@ -743,7 +1125,7 @@ window.renderRelatorios = function() {
         const binding = JSON.parse(p.servidores || '{}');
         const srvList = Object.keys(binding).map(srvId => { 
           const srv = servidores.find(serv => serv.__backendId === srvId); 
-          return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? esc(srv.nome) : 'Removido'} (${esc(binding[srvId])}h)</span>`; 
+          return `<span class="inline-block px-2.5 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-sm mb-1 mr-1">${srv ? esc(srv.nome) : 'Servidor excluído'} (${formatHoras(binding[srvId])}h)</span>`; 
         }).join('') || '<span class="text-slate-400 text-xs italic">Nenhum servidor vinculado</span>';
 
         const linkBtn = p.link ? `<a href="${safeUrl(p.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-accent hover:bg-blue-100 border border-blue-100 rounded-lg text-xs font-bold transition-colors w-full mt-2 md:mt-0"><i data-lucide="external-link" style="width:14px;height:14px;"></i> Acessar Documento</a>` : '';
@@ -753,7 +1135,7 @@ window.renderRelatorios = function() {
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <div class="flex gap-2 items-center flex-wrap">
-                  <span class="font-bold text-slate-800 text-base truncate">Nº ${esc(p.numero)} - DRG/PEP/IFSP</span>
+                  <span class="font-bold text-slate-800 text-base truncate">${formatPortariaNum(p.numero)}</span>
                   ${tipoTag}
                   <span class="status-pill ${s.class} scale-90 origin-left m-0">${s.label}</span>
                 </div>
@@ -791,10 +1173,13 @@ window.renderRelatorios = function() {
 // ==========================================
 const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
 const sidebar = document.getElementById('sidebar');
-let isSidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+// Em telas pequenas o menu sempre começa recolhido e, quando aberto, fica sobreposto ao conteúdo
+const mobileQuery = window.matchMedia('(max-width: 767px)');
+let isSidebarCollapsed = mobileQuery.matches || localStorage.getItem('sidebarCollapsed') === 'true';
 
 function applySidebarState() {
   if (!sidebar) return;
+  sidebar.classList.toggle('sidebar-expanded', !isSidebarCollapsed);
   const texts = document.querySelectorAll('.sidebar-text');
   if (isSidebarCollapsed) {
     sidebar.classList.remove('w-64', 'px-4'); sidebar.classList.add('w-20', 'px-2'); 
@@ -808,7 +1193,11 @@ function applySidebarState() {
 }
 applySidebarState();
 if (btnToggleSidebar) {
-  btnToggleSidebar.addEventListener('click', () => { isSidebarCollapsed = !isSidebarCollapsed; localStorage.setItem('sidebarCollapsed', isSidebarCollapsed); applySidebarState(); });
+  btnToggleSidebar.addEventListener('click', () => {
+    isSidebarCollapsed = !isSidebarCollapsed;
+    if (!mobileQuery.matches) localStorage.setItem('sidebarCollapsed', isSidebarCollapsed);
+    applySidebarState();
+  });
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -818,7 +1207,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
     btn.classList.add('active', 'bg-blue-50', 'text-accent'); 
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
-    if (tab.startsWith('rel-')) window.renderRelatorios(); 
+    if (tab.startsWith('rel-')) window.renderRelatorios();
+    if (mobileQuery.matches && !isSidebarCollapsed) { isSidebarCollapsed = true; applySidebarState(); }
     if(window.lucide) lucide.createIcons();
   });
 });
@@ -837,6 +1227,7 @@ document.querySelectorAll('.tab-rel-btn').forEach(btn => {
 });
 
 document.getElementById('btn-new-portaria').addEventListener('click', (e) => { e.preventDefault(); window.openModalPortaria(); });
+document.getElementById('btn-import-pdf').addEventListener('click', (e) => { e.preventDefault(); openModalImportPdf(); });
 document.getElementById('btn-new-servidor').addEventListener('click', (e) => { e.preventDefault(); window.openModalServidor(); });
 document.getElementById('btn-import-csv').addEventListener('click', (e) => { e.preventDefault(); window.openModalImportCSV(); });
 
@@ -868,8 +1259,9 @@ document.getElementById('filter-ano-portaria')?.addEventListener('change', windo
 document.getElementById('filter-ano-rel-portaria')?.addEventListener('change', window.renderRelatorios);
 document.getElementById('filter-tipo-rel-portaria')?.addEventListener('change', window.renderRelatorios);
 
-function downloadCSV(filename, data) { 
-  const blob = new Blob([data.join('\n')], { type: 'text/csv;charset=utf-8;' }); 
+// CSV no padrão do Excel em português: separador ";" e BOM UTF-8 para os acentos
+function downloadCSV(filename, rows) {
+  const blob = new Blob(['﻿' + rows.map(csvRow).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a'); 
   link.href = URL.createObjectURL(blob); 
   link.download = filename; 
@@ -879,33 +1271,30 @@ function downloadCSV(filename, data) {
 }
 
 function csvField(v) { return `"${String(v ?? '').replace(/"/g, '""')}"`; }
+function csvRow(values) { return values.map(csvField).join(';'); }
 
 document.getElementById('btn-export-servidores').addEventListener('click', (e) => {
   e.preventDefault();
   if (servidores.length === 0) return showToast('Não há servidores para exportar', 'warn');
-  const srvHoras = {}; const srvPortarias = {};
-  servidores.forEach(s => { srvHoras[s.__backendId] = 0; srvPortarias[s.__backendId] = 0; });
-  portarias.forEach(p => {
-    if (p.status === 'revogada' || getStatus(p.data_validade).key === 'expired') return;
-    const binding = JSON.parse(p.servidores || '{}');
-    Object.keys(binding).forEach(srvId => { srvHoras[srvId] = (srvHoras[srvId] || 0) + binding[srvId]; srvPortarias[srvId] = (srvPortarias[srvId] || 0) + 1; });
-  });
-  const csv = ['"Nome","Segmento","Setor","Total de Horas","Quantidade de Portarias Ativas"'];
-  servidores.forEach(s => { csv.push(`${csvField(s.nome)},${csvField(s.segmento)},${csvField(s.setor)},${srvHoras[s.__backendId] || 0},${srvPortarias[s.__backendId] || 0}`); });
+  const { srvHoras, srvPortarias } = calcularCargaServidores();
+  const csv = [['Nome', 'Segmento', 'Setor', 'Total de Horas', 'Quantidade de Portarias Ativas']];
+  servidores.forEach(s => { csv.push([s.nome, s.segmento, s.setor, formatHoras(srvHoras[s.__backendId]), srvPortarias[s.__backendId] || 0]); });
   downloadCSV(`relatorio_servidores_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
 
 document.getElementById('btn-export-portarias').addEventListener('click', (e) => {
   e.preventDefault();
-  if (portarias.length === 0) return showToast('Não há portarias para exportar', 'warn');
-  const csv = ['"Número","Descrição","Tipo","Link","Data Publicação","Data Validade","Status"'];
-  portarias.forEach(p => {
+  const lista = filtrarPortariasRelatorio().sort(sortDescNum);
+  if (lista.length === 0) return showToast('Não há portarias para exportar', 'warn');
+  const csv = [['Número', 'Descrição', 'Tipo', 'Link', 'Data Publicação', 'Data Validade', 'Status']];
+  lista.forEach(p => {
     const s = p.status === 'revogada' ? 'Revogada' : getStatus(p.data_validade).label;
-    csv.push(`${csvField(p.numero)},${csvField(p.descricao)},${csvField(p.tipo)},${csvField(p.link)},${csvField(p.data_publicacao)},${csvField(p.data_validade)},${csvField(s)}`);
+    csv.push([p.numero, p.descricao, p.tipo, p.link, formatDate(p.data_publicacao), p.data_validade ? formatDate(p.data_validade) : 'Indeterminada', s]);
   });
   downloadCSV(`relatorio_portarias_${new Date().toISOString().split('T')[0]}.csv`, csv); showToast('Download iniciado!', 'success');
 });
 
 // INICIALIZAÇÃO DA INTERFACE DO USUÁRIO
+renderAnoOptions();
 updateAdminUI();
 if(window.lucide) lucide.createIcons();
