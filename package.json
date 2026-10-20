@@ -1,0 +1,14 @@
+{
+  "name": "portarias-ifsp-pep",
+  "private": true,
+  "type": "module",
+  "description": "Dependências do robô que varre o site do campus (robo/varrer-portarias.js). O site em si não precisa de instalação.",
+  "scripts": {
+    "varrer": "node robo/varrer-portarias.js",
+    "simular": "node robo/varrer-portarias.js --simular"
+  },
+  "dependencies": {
+    "firebase": "10.8.0",
+    "pdfjs-dist": "3.11.174"
+  }
+}
