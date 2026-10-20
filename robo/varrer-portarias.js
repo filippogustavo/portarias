@@ -5,9 +5,12 @@
 // ainda não estão no sistema, extrai os campos (mesmo leitor do site) e grava
 // em "portarias_pendentes" para o admin revisar. Nada é publicado direto.
 //
+// Roda no PC do admin pelo Agendador do Windows (robo/rodar-robo.bat): o site do
+// campus bloqueia acessos vindos de servidores fora do Brasil, como o GitHub Actions.
+//
 // Uso:
-//   node robo/varrer-portarias.js            -> grava as pendentes (precisa de ROBO_EMAIL e ROBO_SENHA)
-//   node robo/varrer-portarias.js --simular  -> só mostra o que faria, sem login e sem gravar
+//   node --env-file=robo/credenciais.env robo/varrer-portarias.js  -> grava as pendentes
+//   node robo/varrer-portarias.js --simular                        -> só mostra o que faria, sem login e sem gravar
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
@@ -108,11 +111,11 @@ async function main() {
     // trim(): espaços ou quebras de linha coladas sem querer nos secrets do GitHub invalidam o login
     const email = (process.env.ROBO_EMAIL || '').trim();
     const senha = (process.env.ROBO_SENHA || '').trim();
-    if (!email || !senha) throw new Error('Defina os secrets ROBO_EMAIL e ROBO_SENHA no GitHub.');
+    if (!email || !senha) throw new Error('Defina ROBO_EMAIL e ROBO_SENHA em robo/credenciais.env.');
     try {
       await signInWithEmailAndPassword(getAuth(app), email, senha);
     } catch (e) {
-      throw new Error(`Login do robô falhou para "${email.replace(/^(.{3}).*(@.*)$/, '$1***$2')}" (${e.code}). Confira se o usuário existe em Firebase > Authentication > Users e se a senha do secret ROBO_SENHA é a mesma.`);
+      throw new Error(`Login do robô falhou para "${email.replace(/^(.{3}).*(@.*)$/, '$1***$2')}" (${e.code}). Confira se o usuário existe em Firebase > Authentication > Users e se a senha em robo/credenciais.env é a mesma.`);
     }
   }
 

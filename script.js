@@ -109,7 +109,7 @@ function formatDate(d) {
   return `${day}/${m}/${y}`;
 }
 
-// Horas podem ser fracionadas (ex: 1,5h). Arredonda para evitar ruído de ponto flutuante.
+// Formata horas no padrão brasileiro (horas são inteiras; o arredondamento protege dados antigos)
 function formatHoras(h) {
   return Number((Number(h) || 0).toFixed(2)).toLocaleString('pt-BR');
 }
@@ -315,7 +315,7 @@ function renderServidorBindingList(portaria) {
         <input type="checkbox" data-srv-id="${esc(srv.__backendId)}" ${bindingMap[srv.__backendId] !== undefined ? 'checked' : ''} class="w-4 h-4 shrink-0 text-accent rounded border-slate-300">
         <div class="flex flex-col min-w-0"><span class="text-sm font-bold text-slate-800 truncate">${esc(srv.nome)}</span><span class="text-xs text-slate-500 truncate">${esc(srv.segmento)} - ${esc(srv.setor)}</span></div>
       </div>
-      <input type="number" data-srv-hours="${esc(srv.__backendId)}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" step="0.5" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
+      <input type="number" data-srv-hours="${esc(srv.__backendId)}" value="${bindingMap[srv.__backendId] || ''}" placeholder="0" min="0" step="1" class="w-16 p-1.5 text-sm border border-slate-300 rounded bg-slate-50 text-center shrink-0">
     </div>
   `).join('');
 }
@@ -333,7 +333,8 @@ document.getElementById('form-portaria').addEventListener('submit', async (e) =>
   document.querySelectorAll('.bind-row input[type="checkbox"]').forEach(cb => {
     if (cb.checked) {
       const srvId = cb.dataset.srvId;
-      const hours = parseFloat(document.querySelector(`input[data-srv-hours="${srvId}"]`).value);
+      // Portarias só usam horas inteiras
+      const hours = parseInt(document.querySelector(`input[data-srv-hours="${srvId}"]`).value, 10);
       servidorBinding[srvId] = Number.isFinite(hours) && hours > 0 ? hours : 0;
     }
   });
@@ -672,7 +673,7 @@ document.getElementById('btn-limpar-importadas').addEventListener('click', () =>
 // ==========================================
 // PORTARIAS PENDENTES (ENCONTRADAS PELO ROBÔ NO SITE)
 // ==========================================
-// O robô (robo/varrer-portarias.js, rodando no GitHub Actions) grava em
+// O robô (robo/varrer-portarias.js, agendado no PC do admin) grava em
 // "portarias_pendentes". Aqui elas entram na mesma lista da importação de PDF.
 // Descartadas ficam marcadas (não apagadas) para o robô não trazê-las de novo.
 function sincronizarPendentes() {

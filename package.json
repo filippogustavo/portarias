@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Dependências do robô que varre o site do campus (robo/varrer-portarias.js). O site em si não precisa de instalação.",
   "scripts": {
-    "varrer": "node robo/varrer-portarias.js",
+    "varrer": "node --env-file=robo/credenciais.env robo/varrer-portarias.js",
     "simular": "node robo/varrer-portarias.js --simular"
   },
   "dependencies": {
