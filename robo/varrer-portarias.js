@@ -105,8 +105,15 @@ async function main() {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   if (!SIMULAR) {
-    if (!process.env.ROBO_EMAIL || !process.env.ROBO_SENHA) throw new Error('Defina ROBO_EMAIL e ROBO_SENHA.');
-    await signInWithEmailAndPassword(getAuth(app), process.env.ROBO_EMAIL, process.env.ROBO_SENHA);
+    // trim(): espaços ou quebras de linha coladas sem querer nos secrets do GitHub invalidam o login
+    const email = (process.env.ROBO_EMAIL || '').trim();
+    const senha = (process.env.ROBO_SENHA || '').trim();
+    if (!email || !senha) throw new Error('Defina os secrets ROBO_EMAIL e ROBO_SENHA no GitHub.');
+    try {
+      await signInWithEmailAndPassword(getAuth(app), email, senha);
+    } catch (e) {
+      throw new Error(`Login do robô falhou para "${email.replace(/^(.{3}).*(@.*)$/, '$1***$2')}" (${e.code}). Confira se o usuário existe em Firebase > Authentication > Users e se a senha do secret ROBO_SENHA é a mesma.`);
+    }
   }
 
   const lerColecao = async nome => (await getDocs(collection(db, nome))).docs.map(d => ({ __backendId: d.id, ...d.data() }));
