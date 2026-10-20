@@ -7,7 +7,8 @@
   
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.296.0/dist/umd/lucide.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet">
   
   <script>
     tailwind.config = {
@@ -54,7 +55,7 @@
       </div>
     </header>
     
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden relative">
       
       <aside id="sidebar" class="w-64 bg-white border-r border-slate-200 flex flex-col py-6 px-4 shrink-0 overflow-y-auto z-40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300">
         <p class="sidebar-text text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">Menu Principal</p>
@@ -98,8 +99,13 @@
         <div class="max-w-6xl mx-auto">
          <div class="flex items-center justify-between mb-6">
           <h2 class="text-2xl font-bold text-slate-800">Portarias</h2>
-          <div id="btn-new-portaria" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md hover:shadow-lg cursor-pointer">
-            <i data-lucide="plus" style="width:16px;height:16px;"></i>Nova Portaria
+          <div class="flex gap-3">
+           <div id="btn-import-pdf" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
+             <i data-lucide="upload" style="width:16px;height:16px;"></i>Importar PDF
+           </div>
+           <div id="btn-new-portaria" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md hover:shadow-lg cursor-pointer">
+             <i data-lucide="plus" style="width:16px;height:16px;"></i>Nova Portaria
+           </div>
           </div>
          </div>
          
@@ -135,9 +141,6 @@
            
            <select id="filter-ano-portaria" class="w-36 px-4 py-3 text-sm font-bold border border-slate-300 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer shadow-sm h-[50px] shrink-0">
               <option value="Todas">Todos os Anos</option>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
            </select>
           </div>
 
@@ -157,8 +160,8 @@
           <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
             <i data-lucide="file-text" style="width:28px;height:28px;color:#94a3b8;"></i>
           </div>
-          <p class="text-slate-800 text-lg font-bold">Nenhuma portaria cadastrada</p>
-          <p class="text-muted text-sm mt-1">Clique em "Nova Portaria" para começar</p>
+          <p id="empty-title" class="text-slate-800 text-lg font-bold">Nenhuma portaria cadastrada</p>
+          <p id="empty-subtitle" class="text-muted text-sm mt-1"></p>
          </div>
         </div>
        </div>
@@ -233,13 +236,10 @@
          <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
           <h2 class="text-2xl font-bold text-slate-800">Relatório: Portaria</h2>
           
-          <div class="flex flex-row items-center gap-3">
-            
+          <div class="flex flex-row flex-wrap items-center gap-3">
+
             <select id="filter-ano-rel-portaria" class="w-40 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
               <option value="Todas">Todos os Anos</option>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
             </select>
 
             <select id="filter-tipo-rel-portaria" class="w-48 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
@@ -485,12 +485,36 @@
     </div>
     <div class="p-5 space-y-4">
      <div>
-      <p class="text-slate-500 text-xs mb-2">Formato: <code class="text-accent bg-blue-50 px-1 py-0.5 rounded text-xs">nome,segmento,setor</code></p>
+      <p class="text-slate-500 text-xs mb-2">Formato: <code class="text-accent bg-blue-50 px-1 py-0.5 rounded text-xs">nome,segmento,setor</code> (vírgula ou ponto e vírgula)</p>
       <textarea id="csv-input" style="min-height:120px;font-family:monospace;font-size:0.75rem;"></textarea>
      </div>
      <div class="flex gap-3">
        <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalImportCSV()">Cancelar</button> 
        <button type="button" id="btn-process-csv" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Importar</button>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <div id="modal-import-pdf" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
+   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-3xl max-h-[90%] overflow-auto fade-in">
+    <div class="flex items-center justify-between p-5 border-b border-slate-100">
+     <h2 class="font-display text-lg font-bold text-slate-800">Importar Portarias (PDF do SUAP)</h2>
+     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalImportPdf()">
+       <i data-lucide="x" style="width:18px;height:18px;"></i>
+     </button>
+    </div>
+    <div class="p-5 space-y-4">
+     <label id="pdf-drop" for="pdf-input" class="block border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-accent hover:bg-blue-50/40 transition-colors">
+       <i data-lucide="file-text" style="width:28px;height:28px;color:#94a3b8;display:inline-block;"></i>
+       <p class="text-sm font-bold text-slate-700 mt-2">Arraste os PDFs aqui ou clique para selecionar</p>
+       <p class="text-xs text-slate-500 mt-1">Os dados são lidos do PDF e nada é salvo sem a sua confirmação. As horas dos servidores não constam no PDF e devem ser conferidas em "Revisar".</p>
+       <input type="file" id="pdf-input" accept="application/pdf,.pdf" multiple class="hidden">
+     </label>
+     <div id="pdf-import-list" class="space-y-3"></div>
+     <div id="pdf-import-actions" class="hidden gap-3 pt-2">
+       <button type="button" id="btn-limpar-importadas" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">Limpar lista</button>
+       <button type="button" id="btn-salvar-importadas" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Salvar selecionadas</button>
      </div>
     </div>
    </div>
