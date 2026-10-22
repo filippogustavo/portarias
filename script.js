@@ -132,11 +132,14 @@ function getStatus(dateStr) {
   return { label: `${diff} dias`, class: 'status-ok', days: diff, key: 'ok' };
 }
 
+// Máscara atual do número das portarias do campus
+const MASCARA_PORTARIA = 'DRG-PEP/IFSP';
+
 function formatPortariaNum(num) {
   if (!num) return '—';
-  let n = esc(num.trim().toUpperCase().replace(/\\/g, '/'));
-  if (n.includes('DRG/PEP/IFSP')) return `Nº ${n}`;
-  return `Nº ${n} - DRG/PEP/IFSP`;
+  // Remove qualquer máscara já digitada no número (DRG/PEP/IFSP, DRG-PEP-IFSP...) e aplica a atual
+  const n = num.trim().toUpperCase().replace(/\\/g, '/').replace(/\s*-?\s*DRG[\/\-]PEP[\/\-]IFSP\s*$/, '');
+  return `Nº ${esc(n)} - ${MASCARA_PORTARIA}`;
 }
 
 // ==========================================

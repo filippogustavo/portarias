@@ -20,7 +20,7 @@ export function dataPorExtenso(dia, mesNome, ano) {
   return dataIso(ano, MESES[semAcento(mesNome).toLowerCase()], dia);
 }
 
-// "100/2026", "Nº 100/2026 - DRG/PEP/IFSP" e "100-2026" viram a mesma chave
+// "100/2026", "Nº 100/2026 - DRG-PEP/IFSP" e "100-2026" viram a mesma chave
 export function chaveNumero(numero) {
   const m = String(numero || '').match(/(\d+)\s*[\/\-]\s*(\d{4})/);
   return m ? `${parseInt(m[1])}/${m[2]}` : '';
