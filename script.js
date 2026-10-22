@@ -766,20 +766,21 @@ window.renderPortarias = function() {
   filtered.sort(sortDescNum);
   
   // Atualiza as Badges respeitando o ano selecionado
+  // Total = todas as portarias publicadas no período, inclusive as revogadas
   let ok = 0, warn = 0, exp = 0, total = 0;
   portarias.forEach(p => {
-    if (p.status === 'revogada') return;
-    
     if (anoF !== 'Todas') {
       const pYear = p.data_publicacao ? p.data_publicacao.split('-')[0] : '';
       if (pYear !== anoF) return;
     }
+    total++;
+    if (p.status === 'revogada') return;
 
     const s = getStatus(p.data_validade);
     if (s.key === 'ok') ok++; else if (s.key === 'warn') warn++; else exp++;
   });
-  
-  document.getElementById('stat-total').textContent = ok + warn + exp; 
+
+  document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-ok').textContent = ok; 
   document.getElementById('stat-warn').textContent = warn; 
   document.getElementById('stat-expired').textContent = exp;
