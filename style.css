@@ -276,16 +276,16 @@ details.table td, details.table th { padding: 4px 12px 4px 0; text-align: left; 
 .sdetail { padding: 2px 18px 20px; background: var(--surface-2); }
 .sub-title { font-size: 11.5px; color: var(--muted); margin: 0 0 4px; }
 .plist { list-style: none; margin: 0 0 16px; padding: 0; max-width: 900px; }
-.plist li { display: grid; grid-template-columns: 10px 84px minmax(0, 1fr) auto 50px 18px; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.plist li { display: grid; grid-template-columns: 10px 84px minmax(0, 1fr) auto 50px; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
 .plist .dot { width: 7px; height: 7px; }
 .plist .n { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plist .d { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plist .s { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .plist .s.warn { color: var(--st-warn-ink); font-weight: 600; }
 .plist .h { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
-.plist a { color: var(--muted); display: grid; place-items: center; }
-.plist a:hover { color: var(--brand-ink); }
-.plist a svg { width: 14px; height: 14px; }
+.plist a.n { color: var(--ink); text-decoration: none; }
+.plist a.d { text-decoration: none; }
+.plist li.com-link:hover a.n, .plist li.com-link:hover a.d { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 2px; }
 .plist.hist .n, .plist.hist .d, .plist.hist .h { color: var(--muted); }
 .toggle-hist { background: none; border: 0; padding: 0; color: var(--ink-2); font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; }
 .toggle-hist svg { width: 14px; height: 14px; transition: transform .2s; }
@@ -365,7 +365,7 @@ code { font-size: 12px; background: var(--surface-2); border: 1px solid var(--gr
   .detail { padding-left: 18px; }
   .shead, .srow { grid-template-columns: minmax(0, 1fr) 80px 140px 16px; }
   .shead .c-seg, .srow .seg-txt { display: none; }
-  .plist li { grid-template-columns: 10px 76px minmax(0, 1fr) 44px 18px; } .plist .s { display: none; }
+  .plist li { grid-template-columns: 10px 76px minmax(0, 1fr) 44px; } .plist .s { display: none; }
 }
 @media (max-width: 760px) {
   .sidebar { display: none; }

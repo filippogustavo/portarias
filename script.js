@@ -406,11 +406,14 @@ function renderRobo() {
     return `${dif === 0 ? 'hoje' : dif === 1 ? 'ontem' : d.toLocaleDateString('pt-BR')}, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`; };
   // Parado: sem execução com sucesso há mais de 4 dias (cobre fim de semana e feriado)
   const parado = !sucesso || (Date.now() - sucesso) > 4 * 864e5;
+  // Ano novo sem portarias no site a partir de fevereiro: provável mudança no endereço da página
+  const semAnoNovo = robo.conferidas_ano_atual === 0 && String(robo.ano) === ANO_ATUAL && new Date().getMonth() >= 1;
 
-  if (robo.sucesso === false || parado) {
+  if (robo.sucesso === false || parado || semAnoNovo) {
     el.classList.add('alerta');
     const motivo = robo.sucesso === false ? `A última varredura (${quando(ultima)}) falhou${robo.erro ? ': ' + esc(robo.erro) : ''}.`
-      : `O robô não roda desde ${sucesso ? quando(sucesso) : 'há vários dias'}. Verifique se o computador está ligado.`;
+      : parado ? `O robô não roda desde ${sucesso ? quando(sucesso) : 'há vários dias'}. Verifique se o computador está ligado.`
+      : `O robô não encontrou portarias de ${ANO_ATUAL} no site do campus. Verifique se o endereço da página de portarias do ano mudou.`;
     el.innerHTML = `<div class="bot"><i data-lucide="bot"></i></div><div class="txt"><div><span class="pulse"></span><b>Robô de varredura precisa de atenção</b></div>
       <div class="meta">${motivo} · ${pend}</div></div>${botao}`;
     return;
@@ -579,10 +582,13 @@ function linhaServidor(s, c, maxH) {
 function itemPortariaServidor({ p, horas }) {
   const s = p._st === 'vencer' ? `<span class="s warn">Vence em ${p._dias}d</span>`
           : p._st === 'vencida' ? '<span class="s">Vencida</span>' : p._st === 'revogada' ? '<span class="s">Revogada</span>' : '<span class="s"></span>';
+  // Número e descrição abrem o documento (área de clique maior que um ícone)
   const link = safeUrl(p.link);
-  return `<li><span class="dot" style="background:${COR_ST[p._st]}"></span><span class="n">${esc(numeroLimpo(p.numero))}</span>
-    <span class="d" title="${esc(p.descricao)}">${esc(p.descricao)}</span>${s}<span class="h">${formatHoras(horas)} h</span>
-    ${link ? `<a href="${link}" target="_blank" rel="noopener noreferrer" title="Abrir documento"><i data-lucide="external-link"></i></a>` : '<span></span>'}</li>`;
+  const tag = (cls, txt, title = '') => link
+    ? `<a class="${cls}" href="${link}" target="_blank" rel="noopener noreferrer" title="${title || 'Abrir documento'}">${txt}</a>`
+    : `<span class="${cls}"${title ? ` title="${title}"` : ''}>${txt}</span>`;
+  return `<li class="${link ? 'com-link' : ''}"><span class="dot" style="background:${COR_ST[p._st]}"></span>${tag('n', esc(numeroLimpo(p.numero)))}
+    ${tag('d', esc(p.descricao), esc(p.descricao))}${s}<span class="h">${formatHoras(horas)} h</span></li>`;
 }
 
 function detalheServidor(s, c) {

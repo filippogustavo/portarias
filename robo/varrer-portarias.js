@@ -146,13 +146,24 @@ async function varrer(db) {
   const hoje = new Date();
   const anos = hoje.getMonth() === 0 ? [hoje.getFullYear(), hoje.getFullYear() - 1] : [hoje.getFullYear()];
 
-  let novas = [], conferidas = 0;
+  let novas = [], conferidas = 0, paginasLidas = 0, conferidasAnoAtual = 0;
   for (const ano of anos) {
-    const entradas = extrairEntradas(await buscar(paginaDoAno(ano)));
+    let html;
+    try { html = await buscar(paginaDoAno(ano)); }
+    catch (e) {
+      // No início do ano a página do ano novo pode ainda não ter sido criada no site
+      if (/HTTP 404/.test(e.message)) { console.log(`Site ${ano}: página ainda não existe (${paginaDoAno(ano)}).`); continue; }
+      throw e;
+    }
+    paginasLidas++;
+    const entradas = extrairEntradas(html);
     conferidas += entradas.length;
+    if (ano === hoje.getFullYear()) conferidasAnoAtual = entradas.length;
     console.log(`Site ${ano}: ${entradas.length} portarias listadas.`);
     novas.push(...entradas.filter(e => !conhecidas.has(e.chave)));
   }
+  // Nenhuma página encontrada (ex.: o endereço das portarias mudou no site): aí sim é erro
+  if (!paginasLidas) throw new Error(`Página de portarias não encontrada no site (${anos.map(paginaDoAno).join(', ')}).`);
   novas = novas.filter((e, i) => novas.findIndex(o => o.chave === e.chave) === i);
   console.log(`Novas: ${novas.length}${novas.length > MAX_POR_EXECUCAO ? ` (processando ${MAX_POR_EXECUCAO} nesta execução)` : ''}.`);
 
@@ -169,7 +180,8 @@ async function varrer(db) {
     }
   }
   console.log(SIMULAR ? 'Simulação: nada foi gravado.' : `Gravadas ${gravadas} pendente(s).`);
-  return { conferidas, novas: novas.length, gravadas };
+  // conferidas_ano_atual permite ao Painel avisar se a página do ano novo nunca aparecer no site
+  return { conferidas, conferidas_ano_atual: conferidasAnoAtual, ano: hoje.getFullYear(), novas: novas.length, gravadas };
 }
 
 main().then(() => process.exit(0)).catch(e => { console.error('ERRO:', e.message); process.exit(1); });
