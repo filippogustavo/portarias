@@ -14,7 +14,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, doc, setDoc } from 'firebase/firestore';
 import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { analisarPortaria, extrairTextoPdf, extrairRevoga, chaveNumero, classificarTipo, dataPorExtenso } from '../leitor-portarias.js';
 
@@ -119,6 +119,23 @@ async function main() {
     }
   }
 
+  // Registro da execução em sistema/robo: alimenta a linha do robô no Painel
+  // (inclusive o alerta de robô parado ou com erro)
+  const registrar = async dados => {
+    if (SIMULAR) return;
+    try { await setDoc(doc(db, 'sistema', 'robo'), { ultima_execucao: new Date().toISOString(), ...dados }, { merge: true }); }
+    catch (e) { console.error('Não foi possível registrar a execução:', e.message); }
+  };
+  try {
+    const resumo = await varrer(db);
+    await registrar({ sucesso: true, ultimo_sucesso: new Date().toISOString(), erro: null, ...resumo });
+  } catch (e) {
+    await registrar({ sucesso: false, erro: e.message.slice(0, 200) });
+    throw e;
+  }
+}
+
+async function varrer(db) {
   const lerColecao = async nome => (await getDocs(collection(db, nome))).docs.map(d => ({ __backendId: d.id, ...d.data() }));
   const [portarias, pendentes, servidores] = await Promise.all([lerColecao('portarias'), lerColecao('portarias_pendentes'), lerColecao('servidores')]);
   // Conhecidas = já cadastradas + já pendentes (inclusive descartadas, para não voltarem)
@@ -129,9 +146,10 @@ async function main() {
   const hoje = new Date();
   const anos = hoje.getMonth() === 0 ? [hoje.getFullYear(), hoje.getFullYear() - 1] : [hoje.getFullYear()];
 
-  let novas = [];
+  let novas = [], conferidas = 0;
   for (const ano of anos) {
     const entradas = extrairEntradas(await buscar(paginaDoAno(ano)));
+    conferidas += entradas.length;
     console.log(`Site ${ano}: ${entradas.length} portarias listadas.`);
     novas.push(...entradas.filter(e => !conhecidas.has(e.chave)));
   }
@@ -151,6 +169,7 @@ async function main() {
     }
   }
   console.log(SIMULAR ? 'Simulação: nada foi gravado.' : `Gravadas ${gravadas} pendente(s).`);
+  return { conferidas, novas: novas.length, gravadas };
 }
 
 main().then(() => process.exit(0)).catch(e => { console.error('ERRO:', e.message); process.exit(1); });

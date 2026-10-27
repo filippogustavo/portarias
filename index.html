@@ -1,538 +1,256 @@
 <!doctype html>
-<html lang="pt-BR" class="h-full">
- <head>
+<html lang="pt-BR">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Controle de Portarias</title>
-  
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <meta name="description" content="Controle de portarias do IFSP Campus Presidente Epitácio">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 38 50'%3E%3Ccircle cx='5' cy='5' r='5' fill='%23c8191e'/%3E%3Cg fill='%232f9e41'%3E%3Crect x='13' width='10' height='10' rx='1.5'/%3E%3Crect x='26' width='10' height='10' rx='1.5'/%3E%3Crect y='13' width='10' height='10' rx='1.5'/%3E%3Crect x='13' y='13' width='10' height='10' rx='1.5'/%3E%3Crect y='26' width='10' height='10' rx='1.5'/%3E%3Crect x='13' y='26' width='10' height='10' rx='1.5'/%3E%3Crect x='26' y='26' width='10' height='10' rx='1.5'/%3E%3Crect y='39' width='10' height='10' rx='1.5'/%3E%3Crect x='13' y='39' width='10' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+  <script>
+    // Aplica o tema salvo antes de desenhar a página (evita piscar claro→escuro)
+    try { const t = localStorage.getItem('tema'); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.296.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet">
-  
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            ink: '#0f172a',      
-            slate_bg: '#f8fafc', 
-            card: '#ffffff',     
-            accent: '#2563eb',   
-            muted: '#64748b'     
-          }
-        }
-      }
-    }
-  </script>
-  
   <link rel="stylesheet" href="style.css">
- </head>
- 
- <body class="h-full bg-slate_bg font-body text-ink overflow-hidden">
-  <div id="app" class="h-full w-full">
-   <div id="main-app" class="h-full flex flex-col">
-    
-    <header class="shrink-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-sm px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-       
-       <button id="btn-toggle-sidebar" class="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none">
-         <i data-lucide="menu" style="width:24px;height:24px;"></i>
-       </button>
-       
-       <div>
-         <h1 id="el-title" class="font-display text-xl font-bold text-slate-800 leading-tight">Controle de Portarias</h1>
-         <p id="el-subtitle" class="text-muted text-xs font-medium">IFSP Campus Presidente Epitácio</p>
-       </div>
+</head>
+<body>
+<div class="app">
+
+  <!-- ====== Menu lateral ====== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <span class="dot"></span><span></span><span></span>
+        <span></span><span></span><span class="off"></span>
+        <span></span><span></span><span></span>
+        <span></span><span></span><span class="off"></span>
       </div>
-      <div class="flex items-center gap-3">
-        <button id="btn-login" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2"> 
-          <i data-lucide="log-in" style="width:16px;height:16px;"></i> Administrador 
-        </button> 
-        <button id="btn-logout" class="hidden px-4 py-2 rounded-lg text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-2"> 
-          <i data-lucide="log-out" style="width:16px;height:16px;"></i> Sair 
-        </button>
+      <div><div class="brand-name">Controle de<br>Portarias</div><div class="brand-sub">IFSP · Presidente Epitácio</div></div>
+    </div>
+    <nav class="nav">
+      <a href="#painel" data-pagina="painel"><i data-lucide="layout-dashboard"></i>Painel</a>
+      <a href="#portarias" data-pagina="portarias"><i data-lucide="file-text"></i>Portarias<span class="badge" id="badge-portarias"></span></a>
+      <a href="#servidores" data-pagina="servidores"><i data-lucide="users"></i>Servidores<span class="badge" id="badge-servidores"></span></a>
+    </nav>
+    <div class="sidebar-foot">Desenvolvido por Filippo Gustavo Guinossi de Almeida<br>Técnico de Laboratório · Informática<br>CDI-PEP · CTI-PEP</div>
+  </aside>
+
+  <div class="main">
+    <!-- ====== Topo ====== -->
+    <header class="topbar">
+      <label class="search"><i data-lucide="search"></i><input id="busca" type="search" placeholder="Buscar portaria, servidor ou assunto…" autocomplete="off" aria-label="Buscar"><span class="kbd">Ctrl K</span></label>
+      <button class="icon-btn" id="btn-tema" title="Alternar tema claro/escuro" aria-label="Alternar tema"><i data-lucide="moon"></i></button>
+      <div class="auth">
+        <button class="btn so-publico" id="btn-entrar"><i data-lucide="log-in"></i><span class="lbl">Entrar</span></button>
+        <div class="avatar so-admin" aria-hidden="true">AD</div>
+        <div class="who so-admin"><b>Administrador</b><small id="admin-email"></small></div>
+        <button class="icon-btn so-admin" id="btn-sair" title="Sair" aria-label="Sair"><i data-lucide="log-out"></i></button>
       </div>
     </header>
-    
-    <div class="flex-1 flex overflow-hidden relative">
-      
-      <aside id="sidebar" class="w-64 bg-white border-r border-slate-200 flex flex-col py-6 px-4 shrink-0 overflow-y-auto z-40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300">
-        <p class="sidebar-text text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">Menu Principal</p>
-        <nav class="flex flex-col gap-1.5">
-          <button class="tab-btn sidebar-btn active flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="portarias" title="Portarias">
-            <i data-lucide="file-input" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Portarias</span>
-          </button> 
-          <button id="menu-servidores" class="tab-btn sidebar-btn hidden items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="servidores" title="Servidores">
-            <i data-lucide="user-plus" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Servidores</span>
-          </button> 
-          
-          <div class="sidebar-text mt-4 mb-1 px-2">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Relatórios</p>
-          </div>
-          
-          <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="rel-servidores" title="Relatório: Servidor">
-            <i data-lucide="user-search" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Servidor</span>
-          </button>
-          <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="rel-portarias" title="Relatório: Portaria">
-            <i data-lucide="file-search" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Portaria</span>
-          </button>
-         
-          <div class="sidebar-text mt-4 mb-1 px-2">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sistema</p>
-          </div>
-          
-          <button class="tab-btn sidebar-btn flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl font-semibold overflow-hidden" data-tab="sobre" title="Sobre">
-            <i data-lucide="info" style="width:20px;height:20px;" class="shrink-0"></i> 
-            <span class="sidebar-text whitespace-nowrap">Sobre</span>
-          </button>
-        </nav>
-      </aside>
-      
-      <main class="flex-1 overflow-y-auto bg-slate_bg p-6 lg:p-8">
-       
-       <div id="tab-portarias" class="tab-content h-full">
-        <div class="max-w-6xl mx-auto">
-         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-2xl font-bold text-slate-800">Portarias</h2>
-          <div class="flex gap-3">
-           <div id="btn-import-pdf" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
-             <i data-lucide="upload" style="width:16px;height:16px;"></i>Importar PDF
-           </div>
-           <div id="btn-new-portaria" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md hover:shadow-lg cursor-pointer">
-             <i data-lucide="plus" style="width:16px;height:16px;"></i>Nova Portaria
-           </div>
-          </div>
-         </div>
-         
-         <div id="banner-pendentes" class="hidden items-center justify-between gap-4 mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-          <div class="flex items-center gap-3 min-w-0">
-           <div class="p-2.5 bg-white text-emerald-600 rounded-xl border border-emerald-100 shrink-0"><i data-lucide="globe" style="width:20px;height:20px;"></i></div>
-           <div class="min-w-0">
-            <p id="banner-pendentes-qtd" class="font-bold text-emerald-800"></p>
-            <p class="text-xs text-emerald-700">Publicadas no site do campus e ainda não cadastradas. Revise antes de publicar.</p>
-           </div>
-          </div>
-          <button id="btn-ver-pendentes" class="shrink-0 px-4 py-2 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm">Revisar</button>
-         </div>
 
-         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm">
-           <p class="text-muted text-xs uppercase tracking-wider font-bold">Total</p>
-           <p id="stat-total" class="text-3xl font-black text-slate-800 mt-1">0</p>
+    <!-- ====== Painel ====== -->
+    <main class="content" id="pg-painel" data-pagina="painel" hidden>
+      <div class="page-head">
+        <div><h1>Painel de Portarias</h1><p>Visão geral das portarias do campus</p></div>
+        <div class="seg" id="painel-anos" aria-label="Ano"></div>
+      </div>
+      <section class="kpis" id="painel-kpis"></section>
+      <section class="robot so-admin" id="painel-robo"></section>
+      <section class="grid g-2-1">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Portarias publicadas por mês</h3><div class="sub" id="painel-mes-sub"></div></div>
+            <a class="link" href="#portarias">Ver todas <i data-lucide="arrow-right"></i></a>
           </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-green-600">Vigentes</p>
-           <p id="stat-ok" class="text-3xl font-black mt-1 text-green-600">0</p>
-          </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-amber-400"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-amber-600">A Vencer (30 dias)</p>
-           <p id="stat-warn" class="text-3xl font-black mt-1 text-amber-600">0</p>
-          </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-red-500"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-red-600">Vencidas</p>
-           <p id="stat-expired" class="text-3xl font-black mt-1 text-red-600">0</p>
-          </div>
-         </div>
-         
-         <div class="flex flex-col xl:flex-row gap-4 mb-6 items-center justify-between w-full">
-
-          <div class="flex flex-row gap-3 w-full xl:w-auto flex-1">
-           <div class="relative flex-1">
-              <i data-lucide="search" style="width:18px;height:18px;position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#64748b;"></i>
-              <input type="text" id="search-input" placeholder="Buscar por número ou descrição..." style="padding-left:42px;" class="h-[50px] w-full text-sm border border-slate-300 rounded-xl bg-white text-slate-800 focus:outline-none focus:border-accent shadow-sm transition-colors">
-           </div> 
-           
-           <select id="filter-ano-portaria" class="w-36 px-4 py-3 text-sm font-bold border border-slate-300 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer shadow-sm h-[50px] shrink-0">
-              <option value="Todas">Todos os Anos</option>
-           </select>
-          </div>
-
-          <div class="flex gap-1.5 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full xl:w-auto shrink-0 h-[50px] items-center">
-            <button data-filter="all" class="filter-btn h-full px-4 rounded-lg text-xs font-bold transition-all bg-accent text-white shadow-sm whitespace-nowrap">Todas Ativas</button> 
-            <button data-filter="ok" class="filter-btn h-full px-4 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">Vigentes</button> 
-            <button data-filter="warn" class="filter-btn h-full px-4 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">A Vencer</button> 
-            <button data-filter="expired" class="filter-btn h-full px-4 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap">Vencidas</button>
-            <div class="w-px bg-slate-200 h-6 mx-1"></div> 
-            <button data-filter="revogada" class="filter-btn h-full px-4 rounded-lg text-xs font-bold transition-all bg-transparent text-slate-500 hover:text-red-600 hover:bg-red-50 whitespace-nowrap">Revogadas</button>
-          </div>
-
-         </div>
-         
-         <div id="portaria-list" class="space-y-4"></div>
-         <div id="empty-state" class="text-center py-20 hidden bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
-            <i data-lucide="file-text" style="width:28px;height:28px;color:#94a3b8;"></i>
-          </div>
-          <p id="empty-title" class="text-slate-800 text-lg font-bold">Nenhuma portaria cadastrada</p>
-          <p id="empty-subtitle" class="text-muted text-sm mt-1"></p>
-         </div>
+          <div class="colchart" id="painel-colunas"></div>
+          <details class="table"><summary>Ver dados em tabela</summary><table id="painel-colunas-tabela"></table></details>
         </div>
-       </div>
-       
-       <div id="tab-servidores" class="tab-content hidden h-full">
-        <div class="max-w-6xl mx-auto">
-         <div class="flex items-center justify-between mb-8">
-          <h2 class="text-2xl font-bold text-slate-800">Cadastro de Servidores</h2>
-          <div class="flex gap-3">
-           <div id="btn-import-csv" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
-             <i data-lucide="upload" style="width:16px;height:16px;"></i>Importar
-           </div>
-           <div id="btn-new-servidor" class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-blue-700 transition-all shadow-md cursor-pointer">
-             <i data-lucide="plus" style="width:16px;height:16px;"></i>Novo Servidor
-           </div>
-          </div>
-         </div>
-         <div id="servidor-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-         <div id="servidor-empty" class="text-center py-20 bg-white rounded-2xl border border-slate-200 shadow-sm">
-           <i data-lucide="users" style="width:32px;height:32px;color:#94a3b8;display:inline-block;margin-bottom:16px;"></i>
-          <p class="text-slate-800 text-lg font-bold">Nenhum servidor cadastrado</p>
-          <p class="text-muted text-sm mt-1">Cadastre servidores para vinculá-los às portarias</p>
-         </div>
+        <div class="card">
+          <div class="card-head"><div><h3>Situação das portarias</h3><div class="sub" id="painel-sit-sub"></div></div></div>
+          <div class="stack" id="painel-stack"></div>
+          <div class="legend" id="painel-legenda"></div>
         </div>
-       </div>
-       
-       <div id="tab-rel-servidores" class="tab-content hidden h-full">
-        <div class="max-w-6xl mx-auto">
-         
-         <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
-          <h2 class="text-2xl font-bold text-slate-800">Relatório: Servidor</h2>
-          
-          <div class="flex items-center gap-3 w-full md:w-auto">
-            <div class="relative flex-1 md:w-64">
-              <i data-lucide="search" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;"></i>
-              <input type="text" id="search-rel-srv" placeholder="Buscar servidor..." class="w-full pl-8 py-2 text-sm border border-slate-300 rounded-lg focus:border-accent focus:outline-none transition-colors">
-            </div>
-            <button id="btn-export-servidores" class="px-5 py-2 rounded-lg text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm shrink-0 relative z-10"> 
-              <i data-lucide="download" style="width:16px;height:16px;"></i>Exportar
-            </button>
+      </section>
+      <section class="grid g-1-1">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Vencendo nos próximos 30 dias</h3><div class="sub">Renovar ou substituir antes do prazo</div></div>
+            <a class="link" href="#portarias/vencer">Ver todas <i data-lucide="arrow-right"></i></a>
           </div>
-         </div>
-
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div class="bg-card rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-4">
-           <div class="p-3 bg-blue-50 text-accent rounded-xl"><i data-lucide="users" style="width:24px;height:24px;"></i></div>
-           <div>
-            <p class="text-muted text-xs uppercase tracking-wider font-bold">Total de Servidores</p>
-            <p id="stat-srv-total" class="text-3xl font-black text-slate-800 mt-1">0</p>
-           </div>
-          </div>
-          <div class="bg-card rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-4">
-           <div class="p-3 bg-amber-50 text-amber-500 rounded-xl"><i data-lucide="clock" style="width:24px;height:24px;"></i></div>
-           <div>
-            <p class="text-muted text-xs uppercase tracking-wider font-bold">Total de Horas Alocadas</p>
-            <p id="stat-srv-horas" class="text-3xl font-black text-slate-800 mt-1">0</p>
-           </div>
-          </div>
-         </div>
-
-         <div id="relatorio-servidores" class="space-y-3"></div>
-         
-         <div id="relatorio-servidores-empty" class="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-500 font-medium text-sm hidden">
-          Nenhum servidor encontrado com este nome
-         </div>
-         
+          <div class="list" id="painel-vencendo"></div>
         </div>
-       </div>
-
-       <div id="tab-rel-portarias" class="tab-content hidden h-full">
-        <div class="max-w-6xl mx-auto">
-         <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-200 pb-4 gap-4">
-          <h2 class="text-2xl font-bold text-slate-800">Relatório: Portaria</h2>
-          
-          <div class="flex flex-row flex-wrap items-center gap-3">
-
-            <select id="filter-ano-rel-portaria" class="w-40 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
-              <option value="Todas">Todos os Anos</option>
-            </select>
-
-            <select id="filter-tipo-rel-portaria" class="w-48 px-3 py-2 text-sm font-bold border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-accent cursor-pointer">
-              <option value="Todas">Todas (Tipos)</option>
-              <option value="Fiscalização">Fiscalização</option>
-              <option value="Comissão">Comissão</option>
-              <option value="Diversas">Diversas</option>
-            </select>
-            
-            <button id="btn-export-portarias" class="px-5 py-2 rounded-lg text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm shrink-0"> 
-              <i data-lucide="download" style="width:16px;height:16px;"></i>Exportar
-            </button>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Maior carga horária</h3><div class="sub" id="painel-carga-sub"></div></div>
+            <a class="link" href="#servidores">Ver todos <i data-lucide="arrow-right"></i></a>
           </div>
-         </div>
-
-         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-green-600">Vigentes</p>
-           <p id="stat-port-vigentes" class="text-3xl font-black mt-1 text-green-600">0</p>
-          </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-amber-400"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-amber-600">A Vencer</p>
-           <p id="stat-port-vencer" class="text-3xl font-black mt-1 text-amber-600">0</p>
-          </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-red-500"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-red-600">Vencidas</p>
-           <p id="stat-port-vencidas" class="text-3xl font-black mt-1 text-red-600">0</p>
-          </div>
-          <div class="bg-card rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
-           <div class="absolute right-0 top-0 w-2 h-full bg-slate-400"></div>
-           <p class="text-xs uppercase tracking-wider font-bold text-slate-500">Revogadas</p>
-           <p id="stat-port-revogadas" class="text-3xl font-black mt-1 text-slate-600">0</p>
-          </div>
-         </div>
-
-         <div class="flex gap-2 mb-6 bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-full overflow-x-auto">
-           <button class="tab-rel-btn active flex-1 px-6 py-2.5 text-sm font-bold rounded-lg bg-blue-50 text-accent whitespace-nowrap" data-tab-rel="vigentes">Vigentes</button> 
-           <button class="tab-rel-btn flex-1 px-6 py-2.5 text-sm font-bold rounded-lg bg-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap" data-tab-rel="vencer">A Vencer</button> 
-           <button class="tab-rel-btn flex-1 px-6 py-2.5 text-sm font-bold rounded-lg bg-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap" data-tab-rel="vencidas">Vencidas</button> 
-           <div class="w-px bg-slate-200 mx-1 my-2"></div>
-           <button class="tab-rel-btn flex-1 px-6 py-2.5 text-sm font-bold rounded-lg bg-transparent text-slate-500 hover:text-red-600 whitespace-nowrap" data-tab-rel="revogadas">Revogadas</button>
-         </div>
-         
-         <div id="rel-vigentes-content">
-          <div id="relatorio-vigentes" class="space-y-4"></div>
-         </div>
-         <div id="rel-vencer-content" class="hidden">
-          <div id="relatorio-vencer" class="space-y-4"></div>
-         </div>
-         <div id="rel-vencidas-content" class="hidden">
-          <div id="relatorio-vencidas" class="space-y-4"></div>
-         </div>
-         <div id="rel-revogadas-content" class="hidden">
-          <div id="relatorio-revogadas" class="space-y-4"></div>
-         </div>
-
+          <div class="hbars" id="painel-carga"></div>
         </div>
-       </div>
-
-       <div id="tab-sobre" class="tab-content hidden h-full">
-        <div class="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200 p-8 md:p-10 shadow-sm mt-8">
-         <div class="space-y-6 text-slate-700 leading-relaxed">
-      
-          <div>
-           <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Desenvolvido por</p>
-        
-           <p class="flex items-center gap-3 font-black text-2xl text-slate-800 mb-4">
-            <i data-lucide="contact" class="text-green-600" style="width:24px;height:24px;"></i>
-            Filippo Gustavo Guinossi de Almeida
-           </p>
-        
-           <ul class="space-y-3 font-medium">
-            <li class="flex items-center gap-3">
-             <i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> 
-             Técnico de Laboratório - Área Informática
-             </li>
-            <li class="flex items-center gap-3">
-             <i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> 
-             Coordenadoria de Apoio à Direção (CDI-PEP)
-             </li>
-            <li class="flex items-center gap-3">
-             <i data-lucide="chevron-right" style="width:20px;height:20px;" class="text-accent"></i> 
-             Coordenadoria de Tecnologia da Informação (CTI-PEP)
-            </li>
-           </ul>
-          </div>            
-      
-          <div>
-           <p class="font-bold text-slate-800 text-lg">IFSP - Campus Presidente Epitácio</p>
-          </div>
-
-         </div>
+      </section>
+      <section class="grid g-1-2">
+        <div class="card">
+          <div class="card-head"><div><h3>Por tipo</h3><div class="sub" id="painel-tipo-sub"></div></div></div>
+          <div class="hbars" id="painel-tipos"></div>
         </div>
-       </div>
-       
-      </main>
-    </div>
-   </div>
-  </div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Publicadas recentemente</h3><div class="sub">Últimas portarias cadastradas</div></div>
+            <a class="link" href="#portarias">Ver todas <i data-lucide="arrow-right"></i></a>
+          </div>
+          <div class="list" id="painel-recentes"></div>
+        </div>
+      </section>
+    </main>
 
-  <div id="modal-login" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-sm max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 class="font-display text-lg font-bold text-slate-800">Autenticação</h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalLogin()"> 
-       <i data-lucide="x" style="width:18px;height:18px;"></i> 
-     </button>
-    </div>
-    <form id="form-login" class="p-5 space-y-4">
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Usuário (E-mail): </label> <input type="email" id="f-login-user" required></div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Senha: </label> <input type="password" id="f-login-pass" required></div>
-     <div class="flex gap-3 pt-2">
-       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Entrar</button>
-       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalLogin()">Cancelar</button>
-     </div>
-    </form>
-   </div>
-  </div>
-
-  <div id="modal-portaria" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-2xl max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 id="modal-title-portaria" class="font-display text-lg font-bold text-slate-800">Nova Portaria</h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalPortaria()"> 
-       <i data-lucide="x" style="width:18px;height:18px;"></i> 
-     </button>
-    </div>
-    <form id="form-portaria" class="p-5 space-y-4">
-     <div class="grid grid-cols-2 gap-3">
-      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Número *</label> <input type="text" id="f-portaria-numero" placeholder="001/2026" required></div>
-      <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Publicação *</label> <input type="date" id="f-portaria-pub" required></div>
-     </div>
-     
-     <div class="grid grid-cols-2 gap-3">
-       <div>
-         <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Tipo *</label> 
-         <select id="f-portaria-tipo" required class="w-full bg-white border border-slate-300 rounded-lg p-2.0">
-           <option value="" disabled selected>Selecione...</option>
-           <option value="Fiscalização">Fiscalização</option>
-           <option value="Comissão">Comissão</option>
-           <option value="Diversas">Diversas</option>
-         </select>
-       </div>
-       <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Validade</label> <input type="date" id="f-portaria-validade"></div>
-     </div>
-
-     <div class="col-span-2">
-      <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Descrição *</label>
-      <textarea id="f-portaria-desc" rows="3" placeholder="Assunto da portaria" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-accent focus:bg-white transition-colors resize-y" required></textarea>
-     </div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Link da Publicação *</label> <input type="url" id="f-portaria-link" placeholder="https://pep.ifsp.edu.br/..." required></div>
-     
-     <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-3">
-       <label class="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2 block">Revogar Portaria Anterior?</label>
-       
-       <div class="relative mb-2">
-         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400" style="width:14px;height:14px;"></i>
-         <input type="text" id="f-search-revoga" placeholder="Digite o número da portaria para filtrar..." 
-                class="w-full pl-9 py-1.5 text-xs border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-200 outline-none transition-all">
-       </div>
-
-       <select id="f-portaria-revoga" class="border-amber-200 bg-white focus:border-amber-400 w-full p-2 text-sm rounded-lg outline-none cursor-pointer"></select>
-       <p class="text-[10px] text-amber-500 mt-1 italic">* Caso esta nova portaria substitua uma antiga, selecione-a acima.</p>
-     </div>
-     
-     <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="text-sm font-bold text-slate-700">Vincular Servidores</h4>
-        <div class="relative w-1/2">
-          <i data-lucide="search" style="width:14px;height:14px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;"></i> 
-          <input type="text" id="f-search-vinculo" onkeyup="filterServidoresBind()" placeholder="Buscar servidor..." style="padding-left:30px; padding-top:6px; padding-bottom:6px; font-size: 0.75rem;">
+    <!-- ====== Portarias ====== -->
+    <main class="content estreito" id="pg-portarias" data-pagina="portarias" hidden>
+      <div class="page-head">
+        <div><h1>Portarias</h1><p id="port-sub"></p></div>
+        <div class="actions">
+          <button class="btn" id="btn-exportar-portarias" title="Exportar a lista filtrada (CSV)"><i data-lucide="download"></i><span class="lbl">Exportar</span></button>
+          <button class="btn so-admin" id="btn-importar-pdf" title="Importar PDFs do SUAP"><i data-lucide="upload"></i><span class="lbl">Importar</span></button>
+          <button class="btn primary so-admin" id="btn-nova-portaria"><i data-lucide="plus"></i><span class="lbl">Nova portaria</span></button>
         </div>
       </div>
-      <div id="servidor-binding-list" class="space-y-2 max-h-52 overflow-y-auto pr-2"></div>
-     </div>
-     
-     <div class="flex gap-3 pt-2">
-       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalPortaria()">Cancelar</button> 
-       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Salvar</button>
-     </div>
-    </form>
-   </div>
-  </div>
+      <div class="filters">
+        <div class="tabs" id="port-abas"></div>
+        <div class="filters-right">
+          <select class="sel" id="port-ano" aria-label="Ano"></select>
+          <select class="sel" id="port-tipo" aria-label="Tipo">
+            <option value="todos">Todos os tipos</option>
+            <option>Comissão</option><option>Fiscalização</option><option>Diversas</option>
+          </select>
+        </div>
+      </div>
+      <div class="aviso-pendentes so-admin" id="port-pendentes" hidden></div>
+      <div id="port-lista"></div>
+    </main>
 
-  <div id="modal-servidor" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-md max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 id="modal-title-servidor" class="font-display text-lg font-bold text-slate-800">Novo Servidor</h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalServidor()"> 
-       <i data-lucide="x" style="width:18px;height:18px;"></i> 
-     </button>
-    </div>
-    <form id="form-servidor" class="p-5 space-y-4">
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Nome *</label> <input type="text" id="f-servidor-nome" placeholder="Filippo Gustavo Guinossi de Almeida" required></div>
-     <div>
-      <label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Segmento *</label> 
-      <select id="f-servidor-segmento" required>
-       <option value="" disabled selected>Selecione...</option>
-       <option value="Técnico-Administrativo">Técnico-Administrativo</option>
-       <option value="Docente">Docente</option>
-       <option value="Discente">Discente</option>
-      </select>
-     </div>
-     <div><label class="text-xs text-slate-500 font-bold mb-1 block uppercase tracking-wide">Setor *</label> <input type="text" id="f-servidor-setor" placeholder="CTI-PEP" required></div>
-     <div class="flex gap-3 pt-2">
-       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalServidor()">Cancelar</button> 
-       <button type="submit" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Salvar</button>
-     </div>
-    </form>
-   </div>
+    <!-- ====== Servidores ====== -->
+    <main class="content estreito" id="pg-servidores" data-pagina="servidores" hidden>
+      <div class="page-head">
+        <div><h1>Servidores</h1><p id="serv-sub"></p></div>
+        <div class="actions">
+          <button class="btn" id="btn-exportar-servidores" title="Exportar a lista filtrada (CSV)"><i data-lucide="download"></i><span class="lbl">Exportar</span></button>
+          <button class="btn so-admin" id="btn-importar-csv" title="Importar lista de servidores"><i data-lucide="upload"></i><span class="lbl">Importar</span></button>
+          <button class="btn primary so-admin" id="btn-novo-servidor"><i data-lucide="plus"></i><span class="lbl">Novo servidor</span></button>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="tabs" id="serv-abas"></div>
+        <div class="filters-right">
+          <select class="sel" id="serv-ordem" aria-label="Ordenar">
+            <option value="horas">Maior carga horária</option>
+            <option value="portarias">Mais portarias</option>
+            <option value="nome">Nome (A–Z)</option>
+          </select>
+        </div>
+      </div>
+      <div id="serv-lista" style="margin-top:18px"></div>
+    </main>
   </div>
+</div>
 
-  <div id="modal-detail-portaria" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-lg max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 id="detail-title-portaria" class="font-display text-lg font-bold text-slate-800"></h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeDetailPortaria()"> 
-       <i data-lucide="x" style="width:18px;height:18px;"></i> 
-     </button>
+<!-- ====== Barra inferior (celular) ====== -->
+<nav class="bottom-nav" aria-label="Navegação">
+  <a href="#painel" data-pagina="painel"><i data-lucide="layout-dashboard"></i>Painel</a>
+  <a href="#portarias" data-pagina="portarias"><i data-lucide="file-text"></i>Portarias</a>
+  <a href="#servidores" data-pagina="servidores"><i data-lucide="users"></i>Servidores</a>
+</nav>
+
+<!-- ====== Janela: login ====== -->
+<div class="modal" id="modal-login" hidden>
+  <form class="modal-box sm" id="form-login">
+    <div class="modal-head"><h2>Entrar como administrador</h2><button type="button" class="fechar" data-fechar aria-label="Fechar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="f-login-email">E-mail</label><input class="input" type="email" id="f-login-email" required autocomplete="username"></div>
+      <div class="field"><label for="f-login-senha">Senha</label><input class="input" type="password" id="f-login-senha" required autocomplete="current-password"></div>
     </div>
-    <div id="detail-body-portaria" class="p-5 space-y-4"></div>
-    <div class="p-5 pt-0 flex gap-3">
-      <button id="btn-edit-portaria" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center justify-center gap-2 transition-colors"> 
-        <i data-lucide="edit" style="width:14px;height:14px;"></i>Editar 
-      </button> 
-      <button id="btn-revoke-portaria" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center gap-2 transition-colors border border-red-100"> 
-        <i data-lucide="x-circle" style="width:14px;height:14px;"></i>Revogar 
-      </button>
+    <div class="modal-foot"><button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primary">Entrar</button></div>
+  </form>
+</div>
+
+<!-- ====== Janela: nova / editar portaria ====== -->
+<div class="modal" id="modal-portaria" hidden>
+  <form class="modal-box lg" id="form-portaria">
+    <div class="modal-head"><h2 id="portaria-titulo">Nova portaria</h2><button type="button" class="fechar" data-fechar aria-label="Fechar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <div class="row2">
+        <div class="field"><label for="f-numero">Número *</label><input class="input" id="f-numero" placeholder="Ex.: 196/2026" required></div>
+        <div class="field"><label for="f-tipo">Tipo *</label>
+          <select class="input" id="f-tipo" required><option value="" disabled selected>Selecione…</option><option>Fiscalização</option><option>Comissão</option><option>Diversas</option></select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="f-publicacao">Publicação *</label><input class="input" type="date" id="f-publicacao" required></div>
+        <div class="field"><label for="f-validade">Validade</label><input class="input" type="date" id="f-validade"><span class="hint">Em branco = indeterminada</span></div>
+      </div>
+      <div class="field"><label for="f-descricao">Descrição *</label><textarea class="input" id="f-descricao" rows="3" placeholder="Assunto da portaria" required></textarea></div>
+      <div class="field"><label for="f-link">Link da publicação *</label><input class="input" type="url" id="f-link" placeholder="https://pep.ifsp.edu.br/…" required></div>
+      <div class="box">
+        <div class="box-head"><span class="lbl">Revoga uma portaria anterior?</span><input class="input sm" id="f-revoga-busca" placeholder="Filtrar por número…" aria-label="Filtrar portarias"></div>
+        <select class="input" id="f-revoga" aria-label="Portaria revogada"></select>
+      </div>
+      <div class="box">
+        <div class="box-head"><span class="lbl">Servidores e horas</span><input class="input sm" id="f-vinculo-busca" placeholder="Buscar servidor…" aria-label="Buscar servidor"></div>
+        <div class="bind-list" id="f-vinculos"></div>
+      </div>
     </div>
-   </div>
+    <div class="modal-foot"><button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primary">Salvar</button></div>
+  </form>
+</div>
+
+<!-- ====== Janela: novo / editar servidor ====== -->
+<div class="modal" id="modal-servidor" hidden>
+  <form class="modal-box sm" id="form-servidor">
+    <div class="modal-head"><h2 id="servidor-titulo">Novo servidor</h2><button type="button" class="fechar" data-fechar aria-label="Fechar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="f-srv-nome">Nome *</label><input class="input" id="f-srv-nome" required></div>
+      <div class="field"><label for="f-srv-segmento">Segmento *</label>
+        <select class="input" id="f-srv-segmento" required><option value="" disabled selected>Selecione…</option><option>Técnico-Administrativo</option><option>Docente</option><option>Discente</option></select></div>
+      <div class="field"><label for="f-srv-setor">Setor *</label><input class="input" id="f-srv-setor" placeholder="Ex.: CTI-PEP" required></div>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primary">Salvar</button></div>
+  </form>
+</div>
+
+<!-- ====== Janela: importar servidores (CSV) ====== -->
+<div class="modal" id="modal-csv" hidden>
+  <div class="modal-box">
+    <div class="modal-head"><h2>Importar servidores</h2><button type="button" class="fechar" data-fechar aria-label="Fechar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="f-csv">Uma linha por servidor</label>
+        <textarea class="input" id="f-csv" rows="8" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px" placeholder="Maria da Silva;Docente;CTI-PEP"></textarea>
+        <span class="hint">Formato: <code>nome;segmento;setor</code> (vírgula ou ponto e vírgula)</span></div>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-fechar>Cancelar</button><button type="button" class="btn primary" id="btn-processar-csv">Importar</button></div>
   </div>
+</div>
 
-  <div id="modal-import-csv" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-md max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 class="font-display text-lg font-bold text-slate-800">Importar Servidores</h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalImportCSV()"> 
-       <i data-lucide="x" style="width:18px;height:18px;"></i> 
-     </button>
+<!-- ====== Janela: importar portarias (PDF do SUAP + pendentes do site) ====== -->
+<div class="modal" id="modal-importar" hidden>
+  <div class="modal-box lg">
+    <div class="modal-head"><h2>Importar portarias</h2><button type="button" class="fechar" data-fechar aria-label="Fechar"><i data-lucide="x"></i></button></div>
+    <div class="modal-body">
+      <label class="drop" id="pdf-drop" for="pdf-input">
+        <i data-lucide="file-up" style="width:26px;height:26px"></i>
+        <b>Arraste os PDFs do SUAP aqui ou clique para selecionar</b>
+        <small>Os dados são lidos do PDF e nada é salvo sem a sua confirmação.</small>
+        <input type="file" id="pdf-input" accept="application/pdf,.pdf" multiple hidden>
+      </label>
+      <div class="list" id="imp-lista" style="gap:8px"></div>
     </div>
-    <div class="p-5 space-y-4">
-     <div>
-      <p class="text-slate-500 text-xs mb-2">Formato: <code class="text-accent bg-blue-50 px-1 py-0.5 rounded text-xs">nome,segmento,setor</code> (vírgula ou ponto e vírgula)</p>
-      <textarea id="csv-input" style="min-height:120px;font-family:monospace;font-size:0.75rem;"></textarea>
-     </div>
-     <div class="flex gap-3">
-       <button type="button" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="closeModalImportCSV()">Cancelar</button> 
-       <button type="button" id="btn-process-csv" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md">Importar</button>
-     </div>
+    <div class="modal-foot" id="imp-acoes" hidden>
+      <button type="button" class="btn" id="btn-limpar-importadas">Limpar lista</button>
+      <button type="button" class="btn primary" id="btn-salvar-importadas">Salvar selecionadas</button>
     </div>
-   </div>
   </div>
+</div>
 
-  <div id="modal-import-pdf" class="fixed inset-0 z-[100] overlay-bg hidden items-center justify-center p-4">
-   <div class="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-3xl max-h-[90%] overflow-auto fade-in">
-    <div class="flex items-center justify-between p-5 border-b border-slate-100">
-     <h2 class="font-display text-lg font-bold text-slate-800">Importar Portarias</h2>
-     <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" onclick="closeModalImportPdf()">
-       <i data-lucide="x" style="width:18px;height:18px;"></i>
-     </button>
-    </div>
-    <div class="p-5 space-y-4">
-     <label id="pdf-drop" for="pdf-input" class="block border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-accent hover:bg-blue-50/40 transition-colors">
-       <i data-lucide="file-text" style="width:28px;height:28px;color:#94a3b8;display:inline-block;"></i>
-       <p class="text-sm font-bold text-slate-700 mt-2">Arraste os PDFs aqui ou clique para selecionar</p>
-       <p class="text-xs text-slate-500 mt-1">Os dados são lidos do PDF e nada é salvo sem a sua confirmação. As horas dos servidores não constam no PDF e devem ser conferidas em "Revisar".</p>
-       <input type="file" id="pdf-input" accept="application/pdf,.pdf" multiple class="hidden">
-     </label>
-     <div id="pdf-import-list" class="space-y-3"></div>
-     <div id="pdf-import-actions" class="hidden gap-3 pt-2">
-       <button type="button" id="btn-limpar-importadas" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">Limpar lista</button>
-       <button type="button" id="btn-salvar-importadas" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Salvar selecionadas</button>
-     </div>
-    </div>
-   </div>
-  </div>
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status" hidden></div>
 
-  <div id="toast" class="toast-msg hidden" style="background:#1e293b; color:#ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.1);"></div>
-  
-  <script type="module" src="script.js"></script>
- </body>
+<script type="module" src="script.js"></script>
+</body>
 </html>
