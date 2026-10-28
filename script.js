@@ -397,7 +397,7 @@ function renderRobo() {
   if (!robo?.ultima_execucao) {
     el.classList.remove('alerta');
     el.innerHTML = `<div class="bot"><i data-lucide="bot"></i></div><div class="txt"><div><b>Robô de varredura</b> · ainda não registrou nenhuma execução</div>
-      <div class="meta">Ele verifica o site do campus todo dia útil às 8h30 · ${pend}</div></div>${botao}`;
+      <div class="meta">Ele verifica o site do campus todo dia útil às 10h e às 15h · ${pend}</div></div>${botao}`;
     return;
   }
   const ultima = new Date(robo.ultima_execucao);
@@ -420,7 +420,7 @@ function renderRobo() {
   }
   el.classList.remove('alerta');
   el.innerHTML = `<div class="bot"><i data-lucide="bot"></i></div><div class="txt">
-    <div><span class="pulse"></span><b>Robô de varredura ativo</b> · verifica o site do campus todo dia útil às 8h30</div>
+    <div><span class="pulse"></span><b>Robô de varredura ativo</b> · verifica o site do campus todo dia útil às 10h e às 15h</div>
     <div class="meta">Última varredura: ${quando(ultima)} · ${plural(robo.conferidas || 0, 'portaria conferida', 'portarias conferidas')} no site · ${pend}</div></div>${botao}`;
 }
 
