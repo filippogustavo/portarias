@@ -78,6 +78,8 @@ mark { background: color-mix(in srgb, var(--st-warn) 32%, transparent); color: i
 .nav a .badge { margin-left: auto; background: rgba(255,255,255,.14); color: #fff; font-size: 11px; padding: 1px 8px; border-radius: 99px; }
 .nav a .badge:empty { display: none; }
 .sidebar-foot { margin-top: auto; padding: 14px 12px; border-top: 1px solid rgba(255,255,255,.07); font-size: 11.5px; color: var(--sidebar-muted); line-height: 1.5; }
+.sidebar-foot p { margin: 0 0 8px; }
+.sidebar-foot p:last-child { margin-bottom: 0; }
 
 /* ====== Topo ====== */
 .main { flex: 1; min-width: 0; }
